@@ -1,0 +1,21 @@
+## DATA TEST
+test*/
+*_trial
+*_original
+## Contaienr images
+*.img
+*.simg
+log
+## Nextflow results and logs
+.nextflow*
+.nextflow/
+work/
+data/
+results/
+results2/
+## Oter
+.DS_Store
+*.pyc
+.Rhistory
+##Executables
+nextflow
