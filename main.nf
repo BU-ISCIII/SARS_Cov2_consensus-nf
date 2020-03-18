@@ -67,3 +67,70 @@ def helpMessage() {
       --outdir                      The output directory where the results will be saved
     """.stripIndent()
 }
+
+/*
+ * SET UP CONFIGURATION VARIABLES
+ */
+params.help = false
+
+// Show help emssage
+if (params.help){
+    helpMessage()
+    exit 0
+}
+
+/*
+ * Default and custom value for configurable variables
+ */
+
+params.fasta = false
+if( params.fasta ){
+    fasta_file = file(params.fasta)
+    if( !fasta_file.exists() ) exit 1, "Fasta file not found: ${params.fasta}."
+}
+
+
+// gtf file
+params.gtf = false
+
+if( params.gtf ){
+    gtf_file = file(params.gtf)
+    if( !gtf_file.exists() ) exit 1, "GTF file not found: ${params.gtf}."
+}
+
+// Output md template location
+output_docs = file("$baseDir/docs/output.md")
+
+// Trimming
+// Trimming default
+params.notrim = false
+// Output files options
+params.saveTrimmed = false
+// Default trimming options
+params.trimmomatic_adapters_file = "\$TRIMMOMATIC_PATH/adapters/NexteraPE-PE.fa"
+params.trimmomatic_adapters_parameters = "2:30:10"
+params.trimmomatic_window_length = "4"
+params.trimmomatic_window_value = "20"
+params.trimmomatic_mininum_length = "50"
+
+
+// SingleEnd option
+params.singleEnd = false
+
+// Validate  mandatory inputs
+params.reads = false
+if (! params.reads ) exit 1, "Missing reads: $params.reads. Specify path with --reads"
+
+if ( ! params.gtf ){
+    exit 1, "GTF file not provided for assembly step, please declare it with --gtf /path/to/gtf_file"
+}
+
+/*
+ * Create channel for input files
+ */
+
+// Create channel for input reads.
+Channel
+    .fromFilePairs( params.reads, size: params.singleEnd ? 1 : 2 )
+    .ifEmpty { exit 1, "Cannot find any reads matching: ${params.reads}\nIf this is single-end data, please specify --singleEnd on the command line." }
+    .into { raw_reads_fastqc; raw_reads_trimming }
