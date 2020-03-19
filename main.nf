@@ -134,3 +134,51 @@ Channel
     .fromFilePairs( params.reads, size: params.singleEnd ? 1 : 2 )
     .ifEmpty { exit 1, "Cannot find any reads matching: ${params.reads}\nIf this is single-end data, please specify --singleEnd on the command line." }
     .into { raw_reads_fastqc; raw_reads_trimming }
+
+// Header log info
+log.info "========================================="
+log.info " BU-ISCIII/bacterial_wgs_training : WGS analysis practice v${version}"
+log.info "========================================="
+def summary = [:]
+summary['Reads']               = params.reads
+summary['Data Type']           = params.singleEnd ? 'Single-End' : 'Paired-End'
+summary['Fasta Ref']           = params.fasta
+summary['GTF File']            = params.gtf
+summary['Keep Duplicates']     = params.keepduplicates
+summary['Step']                = params.step
+summary['Container']           = workflow.container
+if(workflow.revision) summary['Pipeline Release'] = workflow.revision
+summary['Current home']        = "$HOME"
+summary['Current user']        = "$USER"
+summary['Current path']        = "$PWD"
+summary['Working dir']         = workflow.workDir
+summary['Output dir']          = params.outdir
+summary['Script dir']          = workflow.projectDir
+summary['Save Trimmed']        = params.saveTrimmed
+if( params.notrim ){
+    summary['Trimming Step'] = 'Skipped'
+} else {
+    summary['Trimmomatic adapters file'] = params.trimmomatic_adapters_file
+    summary['Trimmomatic adapters parameters'] = params.trimmomatic_adapters_parameters
+    summary["Trimmomatic window length"] = params.trimmomatic_window_length
+    summary["Trimmomatic window value"] = params.trimmomatic_window_value
+    summary["Trimmomatic minimum length"] = params.trimmomatic_mininum_length
+}
+summary['Config Profile'] = workflow.profile
+log.info summary.collect { k,v -> "${k.padRight(21)}: $v" }.join("\n")
+log.info "===================================="
+
+// Check that Nextflow version is up to date enough
+// try / throw / catch works for NF versions < 0.25 when this was implemented
+nf_required_version = '0.25.0'
+try {
+    if( ! nextflow.version.matches(">= $nf_required_version") ){
+        throw GroovyException('Nextflow version too old')
+    }
+} catch (all) {
+    log.error "====================================================\n" +
+              "  Nextflow version $nf_required_version required! You are running v$workflow.nextflow.version.\n" +
+              "  Pipeline execution will continue, but things may break.\n" +
+              "  Please run `nextflow self-update` to update Nextflow.\n" +
+              "============================================================"
+}
