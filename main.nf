@@ -44,12 +44,13 @@ def helpMessage() {
 
     The typical command for running the pipeline is as follows:
 
-    nextflow run SARS_Cov2-nf/main.nf --reads '*_R{1,2}.fastq.gz' --fasta ../../REFERENCES/NC_045512.2.fasta --gff ../../REFERENCES/NC_045512.2.gff
+    nextflow run SARS_Cov2-nf/main.nf --reads '*_R{1,2}.fastq.gz' --viral_fasta ../../REFERENCES/NC_045512.2.fasta --viral_gff ../../REFERENCES/NC_045512.2.gff
 
     Mandatory arguments:
       --reads                       Path to input data (must be surrounded with quotes).
-      --fasta                       Path to Fasta reference
-      --gff					            		Path to GFF reference file. (Mandatory if step = assembly)
+      --viral_fasta                 Path to Fasta reference
+      --viral_gff					          Path to GFF reference file. (Mandatory if step = assembly)
+      --host_fasta                  Path to host Fasta sequence
 
     Options:
       --singleEnd                   Specifies that the input is single end reads
@@ -83,19 +84,25 @@ if (params.help){
  * Default and custom value for configurable variables
  */
 
-params.fasta = false
-if( params.fasta ){
-    fasta_file = file(params.fasta)
-    if( !fasta_file.exists() ) exit 1, "Fasta file not found: ${params.fasta}."
+params.viral_fasta = false
+if( params.viral_fasta ){
+    viral_fasta_file = file(params.viral_fasta)
+    if( !viral_fasta_file.exists() ) exit 1, "Fasta file not found: ${params.viral_fasta}."
+}
+
+params.host_fasta = false
+if( params.host_fasta ){
+    host_fasta_file = file(params.host_fasta)
+    if( !host_fasta_file.exists() ) exit 1, "Fasta file not found: ${params.host_fasta}."
 }
 
 
 // gtf file
-params.gtf = false
+viral_gff = false
 
-if( params.gtf ){
-    gtf_file = file(params.gtf)
-    if( !gtf_file.exists() ) exit 1, "GTF file not found: ${params.gtf}."
+if( viral_gff ){
+    gtf_file = file(viral_gff)
+    if( !gtf_file.exists() ) exit 1, "GTF file not found: ${viral_gff}."
 }
 
 // Output md template location
@@ -121,7 +128,7 @@ params.singleEnd = false
 params.reads = false
 if (! params.reads ) exit 1, "Missing reads: $params.reads. Specify path with --reads"
 
-if ( ! params.gtf ){
+if ( ! viral_gff ){
     exit 1, "GTF file not provided for assembly step, please declare it with --gtf /path/to/gtf_file"
 }
 
@@ -142,8 +149,8 @@ log.info "========================================="
 def summary = [:]
 summary['Reads']               = params.reads
 summary['Data Type']           = params.singleEnd ? 'Single-End' : 'Paired-End'
-summary['Fasta Ref']           = params.fasta
-summary['GTF File']            = params.gtf
+summary['Fasta Ref']           = params.viral_fasta
+summary['GTF File']            = viral_gff
 summary['Keep Duplicates']     = params.keepduplicates
 summary['Step']                = params.step
 summary['Container']           = workflow.container
@@ -206,11 +213,14 @@ process fastqc {
 	"""
 }
 
+/*
+ * STEPS 1.2 Trimming
+ */
 process trimming {
 	tag "$prefix"
 	publishDir "${params.outdir}/02-preprocessing", mode: 'copy',
 		saveAs: {filename ->
-			if (filename.indexOf("_fastqc") > 0) "FastQC/$filename"
+			if (filename.indexOf("_fastqc") > 0) "../03-preprocQC/$filename"
 			else if (filename.indexOf(".log") > 0) "logs/$filename"
 else if (filename.indexOf(".fastq.gz") > 0) "trimmed/$filename"
 			else params.saveTrimmed ? filename : null
@@ -220,7 +230,7 @@ else if (filename.indexOf(".fastq.gz") > 0) "trimmed/$filename"
 	set val(name), file(reads) from raw_reads_trimming
 
 	output:
-	file '*_paired_*.fastq.gz' into trimmed_paired_reads,trimmed_paired_reads_bwa,trimmed_paired_reads_unicycler,trimmed_paired_reads_wgsoutbreaker,trimmed_paired_reads_plasmidid,trimmed_paired_reads_mlst,trimmed_paired_reads_res,trimmed_paired_reads_sero,trimmed_paired_reads_vir
+	file '*_paired_*.fastq.gz' into trimmed_paired_reads,trimmed_paired_reads_bwa
 	file '*_unpaired_*.fastq.gz' into trimmed_unpaired_reads
 	file '*_fastqc.{zip,html}' into trimmomatic_fastqc_reports
 	file '*.log' into trimmomatic_results
@@ -234,5 +244,42 @@ else if (filename.indexOf(".fastq.gz") > 0) "trimmed/$filename"
 
 	fastqc -q *_paired_*.fastq.gz
 
+	"""
+}
+/*
+ * STEPS 2.1 Mapping host
+ */
+process mapping_host {
+	tag "$prefix"
+	publishDir "${params.outdir}/04-mapping_host", mode: 'copy',
+		saveAs: {filename ->
+			if (filename.indexOf(".bam") > 0) "mapping/$filename"
+			else if (filename.indexOf(".bai") > 0) "mapping/$filename"
+      else if (filename.indexOf(".txt") > 0) "stats/$filename"
+      else if (filename.indexOf(".stats") > 0) "stats/$filename"
+			else params.saveTrimmed ? filename : null
+	}
+  cpus '10'
+  penv 'openmp'
+
+	input:
+	set file(readsR1),file(readsR2) from trimmed_paired_reads_bwa
+  file refhost from host_fasta
+
+	output:
+	file '*_sorted.bam' into mapping_host_sorted_bam
+  file '*.bam.bai' into mapping_host_bai
+	file '*_flagstat.txt' into mapping_host_flagstat
+	file '*.stats' into mapping_host_picardstats
+
+	script:
+	prefix = name - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_trimmed)?(_val_1)?(_00*)?(\.fq)?(\.fastq)?(\.gz)?$/
+	"""
+	bwa mem -t 10 $refhost $readsR1 $readsR2 > $prefix.sam
+  samtools view -b $prefix.sam > $prefix.bam
+  samtools sort -o $prefix_sorted.bam -O bam -T $prefix $prefix.bam
+  samtools index $prefix_sorted.bam
+  samtools flagstat $prefix_sorted.bam
+  picard CollectWgsMetrics COVERAGE_CAP=1000000 I=$prefix_sorted.bamm O$prefix.stats R=$refhost
 	"""
 }
