@@ -44,12 +44,13 @@ def helpMessage() {
 
     The typical command for running the pipeline is as follows:
 
-    nextflow run SARS_Cov2-nf/main.nf --reads '*_R{1,2}.fastq.gz' --viral_fasta ../../REFERENCES/NC_045512.2.fasta --viral_gff ../../REFERENCES/NC_045512.2.gff --host_fasta ../REFERENCES/hg38.fasta --host_index ../REFERENCES/hg38.fasta --outdir ./ -profile hpc_isciii
+    nextflow run SARS_Cov2-nf/main.nf --reads '*_R{1,2}.fastq.gz' --viral_fasta ../../REFERENCES/NC_045512.2.fasta --viral_gff ../../REFERENCES/NC_045512.2.gff --viral_index '../REFERENCES/NC_045512.2.fasta.*' --host_fasta ../REFERENCES/hg38.fasta --host_index '/processing_Data/bioinformatics/references/eukaria/homo_sapiens/hg38/UCSC/genome/hg38.fullAnalysisSet.fa.*' --outdir ./ -profile hpc_isciii
 
     Mandatory arguments:
       --reads                       Path to input data (must be surrounded with quotes).
       --viral_fasta                 Path to Fasta reference
       --viral_gff					          Path to GFF reference file. (Mandatory if step = assembly)
+      --viral_index                 Path to viral fasta index
       --host_fasta                  Path to host Fasta sequence
       --host_index                  Path to host fasta index
 
@@ -116,6 +117,14 @@ if( params.host_index ){
         .ifEmpty { exit 1, "Host fasta index not found: ${params.host_index}" }
         .into { host_index_files }
 }
+
+if( params.viral_index ){
+    Channel
+        .fromPath(params.viral_index)
+        .ifEmpty { exit 1, "Viral fasta index not found: ${params.viral_index}" }
+        .into { viral_index_files }
+}
+
 
 // Output md template location
 output_docs = file("$baseDir/docs/output.md")
@@ -242,7 +251,7 @@ process trimming {
 	set val(name), file(reads) from raw_reads_trimming
 
 	output:
-	file '*_paired_*.fastq.gz' into trimmed_paired_reads,trimmed_paired_reads_bwa
+	file '*_paired_*.fastq.gz' into trimmed_paired_reads,trimmed_paired_reads_bwa,trimmed_paired_reads_bwa_virus
 	file '*_unpaired_*.fastq.gz' into trimmed_unpaired_reads
 	file '*_fastqc.{zip,html}' into trimmomatic_fastqc_reports
 	file '*.log' into trimmomatic_results
@@ -280,10 +289,10 @@ process mapping_host {
   file index from host_index_files.collect()
 
 	output:
-	file '*_sorted.bam' into mapping_host_sorted_bam
-  file '*.bam.bai' into mapping_host_bai
-	file '*_flagstat.txt' into mapping_host_flagstat
-	file '*.stats' into mapping_host_picardstats
+	file '*_sorted.bam' into mapping_host_sorted_bam_host
+  file '*.bam.bai' into mapping_host_bai_host
+	file '*_flagstat.txt' into mapping_host_flagstat_host
+	file '*.stats' into mapping_host_picardstats_host
 
 	script:
 	prefix = readsR1.toString() - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_trimmed)?(_val_1)?(_00*)?(\.fq)?(\.fastq)?(\.gz)?$/
@@ -294,5 +303,44 @@ process mapping_host {
   samtools index $prefix"_sorted.bam"
   samtools flagstat $prefix"_sorted.bam" > $prefix"_flagstat.txt"
   picard CollectWgsMetrics COVERAGE_CAP=1000000 I=$prefix"_sorted.bam" O=$prefix".stats" R=$refhost
+	"""
+}
+
+/*
+ * STEPS 2.1 Mapping virus
+ */
+process mapping_virus {
+	tag "$prefix"
+	publishDir "${params.outdir}/05-mapping_virus", mode: 'copy',
+		saveAs: {filename ->
+			if (filename.indexOf(".bam") > 0) "mapping/$filename"
+			else if (filename.indexOf(".bai") > 0) "mapping/$filename"
+      else if (filename.indexOf(".txt") > 0) "stats/$filename"
+      else if (filename.indexOf(".stats") > 0) "stats/$filename"
+			else params.saveTrimmed ? filename : null
+	}
+  cpus '10'
+  penv 'openmp'
+
+	input:
+	set file(readsR1),file(readsR2) from trimmed_paired_reads_bwa_virus
+  file refvirus from viral_fasta_file
+  file index from viral_index_files.collect()
+
+	output:
+	file '*_sorted.bam' into mapping_host_sorted_bam_virus
+  file '*.bam.bai' into mapping_host_bai_virus
+	file '*_flagstat.txt' into mapping_host_flagstat_virus
+	file '*.stats' into mapping_host_picardstats_virus
+
+	script:
+	prefix = readsR1.toString() - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_trimmed)?(_val_1)?(_00*)?(\.fq)?(\.fastq)?(\.gz)?$/
+	"""
+	bwa mem -t 10 $refvirus $readsR1 $readsR2 > $prefix".sam"
+  samtools view -b $prefix".sam" > $prefix".bam"
+  samtools sort -o $prefix"_sorted.bam" -O bam -T $prefix $prefix".bam"
+  samtools index $prefix"_sorted.bam"
+  samtools flagstat $prefix"_sorted.bam" > $prefix"_flagstat.txt"
+  picard CollectWgsMetrics COVERAGE_CAP=1000000 I=$prefix"_sorted.bam" O=$prefix".stats" R=$refvirus
 	"""
 }
