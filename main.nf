@@ -44,7 +44,7 @@ def helpMessage() {
 
     The typical command for running the pipeline is as follows:
 
-    nextflow run SARS_Cov2-nf/main.nf --reads '*_R{1,2}.fastq.gz' --viral_fasta ../../REFERENCES/NC_045512.2.fasta --viral_gff ../../REFERENCES/NC_045512.2.gff --host_fasta ../REFERENCES/hg38.fasta --outdir ./
+    nextflow run SARS_Cov2-nf/main.nf --reads '*_R{1,2}.fastq.gz' --viral_fasta ../../REFERENCES/NC_045512.2.fasta --viral_gff ../../REFERENCES/NC_045512.2.gff --host_fasta ../REFERENCES/hg38.fasta --outdir ./ -profile hpc_isciii
 
     Mandatory arguments:
       --reads                       Path to input data (must be surrounded with quotes).
@@ -226,7 +226,7 @@ process trimming {
 		saveAs: {filename ->
 			if (filename.indexOf("_fastqc") > 0) "../03-preprocQC/$filename"
 			else if (filename.indexOf(".log") > 0) "logs/$filename"
-else if (filename.indexOf(".fastq.gz") > 0) "trimmed/$filename"
+      else if (filename.indexOf(".fastq.gz") > 0) "trimmed/$filename"
 			else params.saveTrimmed ? filename : null
 	}
 
@@ -242,7 +242,7 @@ else if (filename.indexOf(".fastq.gz") > 0) "trimmed/$filename"
 	script:
 	prefix = name - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_trimmed)?(_val_1)?(_00*)?(\.fq)?(\.fastq)?(\.gz)?$/
 	"""
-	trimmomatic PE -phred33 $reads -threads 1 $prefix"_paired_R1.fastq" $prefix"_unpaired_R1.fastq" $prefix"_paired_R2.fastq" $prefix"_unpaired_R2.fastq" ILLUMINACLIP:${params.trimmomatic_adapters_file}:${params.trimmomatic_adapters_parameters} SLIDINGWINDOW:${params.trimmomatic_window_length}:${params.trimmomatic_window_value} MINLEN:${params.trimmomatic_mininum_length} 2> ${name}.log
+	java -jar $TRIMMOMATIC_PATH/trimmomatic-0.33.jar PE -threads 1 -phred33 $reads $prefix"_paired_R1.fastq" $prefix"_unpaired_R1.fastq" $prefix"_paired_R2.fastq" $prefix"_unpaired_R2.fastq" ILLUMINACLIP:${params.trimmomatic_adapters_file}:${params.trimmomatic_adapters_parameters} SLIDINGWINDOW:${params.trimmomatic_window_length}:${params.trimmomatic_window_value} MINLEN:${params.trimmomatic_mininum_length} 2> ${name}.log
 
 	gzip *.fastq
 
@@ -267,7 +267,7 @@ process mapping_host {
   penv 'openmp'
 
 	input:
-	set file(readsR1),file(readsR2) from trimmed_paired_reads_bwa
+	set val(name), file(readsR1),file(readsR2) from trimmed_paired_reads_bwa
   file refhost from host_fasta_file
 
 	output:
@@ -277,13 +277,13 @@ process mapping_host {
 	file '*.stats' into mapping_host_picardstats
 
 	script:
-	prefix = name - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_trimmed)?(_val_1)?(_00*)?(\.fq)?(\.fastq)?(\.gz)?$/
+	prefix = readsR1.toString() - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_trimmed)?(_val_1)?(_00*)?(\.fq)?(\.fastq)?(\.gz)?$/
 	"""
-	bwa mem -t 10 $refhost $readsR1 $readsR2 > $prefix.sam
-  samtools view -b $prefix.sam > $prefix.bam
-  samtools sort -o $prefix_sorted.bam -O bam -T $prefix $prefix.bam
-  samtools index $prefix_sorted.bam
-  samtools flagstat $prefix_sorted.bam
-  picard CollectWgsMetrics COVERAGE_CAP=1000000 I=$prefix_sorted.bamm O$prefix.stats R=$refhost
+	bwa mem -t 10 $refhost $readsR1 $readsR2 > $prefix".sam"
+  samtools view -b $prefix".sam" > $prefix".bam"
+  samtools sort -o $prefix"_sorted.bam" -O bam -T $prefix $prefix".bam"
+  samtools index $prefix"_sorted.bam"
+  samtools flagstat $prefix"_sorted.bam"
+  picard CollectWgsMetrics COVERAGE_CAP=1000000 I=$prefix"_sorted.bam" O=$prefix".stats" R=$refhost
 	"""
 }
