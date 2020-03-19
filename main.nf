@@ -292,7 +292,7 @@ process mapping_host {
   samtools view -b $prefix".sam" > $prefix".bam"
   samtools sort -o $prefix"_sorted.bam" -O bam -T $prefix $prefix".bam"
   samtools index $prefix"_sorted.bam"
-  samtools flagstat $prefix"_sorted.bam"
+  samtools flagstat $prefix"_sorted.bam" > $prefix"_flagstat.txt"
   picard CollectWgsMetrics COVERAGE_CAP=1000000 I=$prefix"_sorted.bam" O=$prefix".stats" R=$refhost
 	"""
 }
