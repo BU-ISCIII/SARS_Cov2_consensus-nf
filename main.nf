@@ -80,6 +80,9 @@ if (params.help){
     exit 0
 }
 
+// Pipeline version
+version = '1.0'
+
 /*
  * Default and custom value for configurable variables
  */
