@@ -44,13 +44,14 @@ def helpMessage() {
 
     The typical command for running the pipeline is as follows:
 
-    nextflow run SARS_Cov2-nf/main.nf --reads '*_R{1,2}.fastq.gz' --viral_fasta ../../REFERENCES/NC_045512.2.fasta --viral_gff ../../REFERENCES/NC_045512.2.gff --host_fasta ../REFERENCES/hg38.fasta --outdir ./ -profile hpc_isciii
+    nextflow run SARS_Cov2-nf/main.nf --reads '*_R{1,2}.fastq.gz' --viral_fasta ../../REFERENCES/NC_045512.2.fasta --viral_gff ../../REFERENCES/NC_045512.2.gff --host_fasta ../REFERENCES/hg38.fasta --host_index ../REFERENCES/hg38.fasta --outdir ./ -profile hpc_isciii
 
     Mandatory arguments:
       --reads                       Path to input data (must be surrounded with quotes).
       --viral_fasta                 Path to Fasta reference
       --viral_gff					          Path to GFF reference file. (Mandatory if step = assembly)
       --host_fasta                  Path to host Fasta sequence
+      --host_index                  Path to host fasta index
 
     Options:
       --singleEnd                   Specifies that the input is single end reads
@@ -107,6 +108,13 @@ viral_gff = false
 if( viral_gff ){
     gff_file = file(viral_gff)
     if( !gff_file.exists() ) exit 1, "GFF file not found: ${viral_gff}."
+}
+
+if( params.host_index ){
+    Channel
+        .fromPath(params.host_index)
+        .ifEmpty { exit 1, "Host fasta index not found: ${params.host_index}" }
+        .into { host_index_files }
 }
 
 // Output md template location
@@ -267,8 +275,9 @@ process mapping_host {
   penv 'openmp'
 
 	input:
-	set val(name), file(readsR1),file(readsR2) from trimmed_paired_reads_bwa
+	set file(readsR1),file(readsR2) from trimmed_paired_reads_bwa
   file refhost from host_fasta_file
+  file index from host_index_files.collect()
 
 	output:
 	file '*_sorted.bam' into mapping_host_sorted_bam
