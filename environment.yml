@@ -1,0 +1,20 @@
+# You can use this file to create a conda environment for this pipeline:
+#   conda env create -f environment.yml
+name: virus_illumina_sispa
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - fastqc=0.11.8
+  - trimmomatic=0.38
+  - picard=2.18.27
+  - samtools=1.9
+  - bwa=0.7.12
+  - spades=3.14.0-0
+  - quast=5.0.1
+  - blast=2.9.0-0
+  - varscan=2.4.4-0
+  - lofreq=2.1.4-0
+  - snpeff
+  - multiqc=1.5
