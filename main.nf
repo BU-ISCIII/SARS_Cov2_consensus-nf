@@ -307,7 +307,7 @@ process mapping_host {
 }
 
 /*
- * STEPS 2.1 Mapping virus
+ * STEPS 2.2 Mapping virus
  */
 process mapping_virus {
 	tag "$prefix"
