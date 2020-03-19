@@ -44,7 +44,7 @@ def helpMessage() {
 
     The typical command for running the pipeline is as follows:
 
-    nextflow run SARS_Cov2-nf/main.nf --reads '*_R{1,2}.fastq.gz' --viral_fasta ../../REFERENCES/NC_045512.2.fasta --viral_gff ../../REFERENCES/NC_045512.2.gff
+    nextflow run SARS_Cov2-nf/main.nf --reads '*_R{1,2}.fastq.gz' --viral_fasta ../../REFERENCES/NC_045512.2.fasta --viral_gff ../../REFERENCES/NC_045512.2.gff --host_fasta ../REFERENCES/hg38.fasta --outdir ./
 
     Mandatory arguments:
       --reads                       Path to input data (must be surrounded with quotes).
@@ -74,14 +74,15 @@ def helpMessage() {
  */
 params.help = false
 
+
+// Pipeline version
+version = '1.0'
+
 // Show help emssage
 if (params.help){
     helpMessage()
     exit 0
 }
-
-// Pipeline version
-version = '1.0'
 
 /*
  * Default and custom value for configurable variables
@@ -100,12 +101,12 @@ if( params.host_fasta ){
 }
 
 
-// gtf file
+// GFF file
 viral_gff = false
 
 if( viral_gff ){
-    gtf_file = file(viral_gff)
-    if( !gtf_file.exists() ) exit 1, "GTF file not found: ${viral_gff}."
+    gff_file = file(viral_gff)
+    if( !gff_file.exists() ) exit 1, "GFF file not found: ${viral_gff}."
 }
 
 // Output md template location
@@ -131,8 +132,8 @@ params.singleEnd = false
 params.reads = false
 if (! params.reads ) exit 1, "Missing reads: $params.reads. Specify path with --reads"
 
-if ( ! viral_gff ){
-    exit 1, "GTF file not provided for assembly step, please declare it with --gtf /path/to/gtf_file"
+if ( ! params.viral_gff ){
+    exit 1, "GFF file not provided for assembly step, please declare it with --viral_gff /path/to/gff_file"
 }
 
 /*
@@ -153,7 +154,7 @@ def summary = [:]
 summary['Reads']               = params.reads
 summary['Data Type']           = params.singleEnd ? 'Single-End' : 'Paired-End'
 summary['Fasta Ref']           = params.viral_fasta
-summary['GTF File']            = viral_gff
+summary['GFF File']            = viral_gff
 summary['Keep Duplicates']     = params.keepduplicates
 summary['Step']                = params.step
 summary['Container']           = workflow.container
@@ -267,7 +268,7 @@ process mapping_host {
 
 	input:
 	set file(readsR1),file(readsR2) from trimmed_paired_reads_bwa
-  file refhost from host_fasta
+  file refhost from host_fasta_file
 
 	output:
 	file '*_sorted.bam' into mapping_host_sorted_bam
