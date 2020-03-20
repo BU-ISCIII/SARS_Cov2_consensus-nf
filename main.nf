@@ -111,21 +111,6 @@ if( viral_gff ){
     if( !gff_file.exists() ) exit 1, "GFF file not found: ${viral_gff}."
 }
 
-if( params.host_index ){
-    Channel
-        .fromPath(params.host_index)
-        .ifEmpty { exit 1, "Host fasta index not found: ${params.host_index}" }
-        .into { host_index_files }
-}
-
-if( params.viral_index ){
-    Channel
-        .fromPath(params.viral_index)
-        .ifEmpty { exit 1, "Viral fasta index not found: ${params.viral_index}" }
-        .into { viral_index_files }
-}
-
-
 // Output md template location
 output_docs = file("$baseDir/docs/output.md")
 
@@ -162,6 +147,22 @@ Channel
     .fromFilePairs( params.reads, size: params.singleEnd ? 1 : 2 )
     .ifEmpty { exit 1, "Cannot find any reads matching: ${params.reads}\nIf this is single-end data, please specify --singleEnd on the command line." }
     .into { raw_reads_fastqc; raw_reads_trimming }
+
+// Create channel for reference index
+if( params.host_index ){
+    Channel
+        .fromPath(params.host_index)
+        .ifEmpty { exit 1, "Host fasta index not found: ${params.host_index}" }
+        .into { host_index_files }
+}
+
+if( params.viral_index ){
+    Channel
+        .fromPath(params.viral_index)
+        .ifEmpty { exit 1, "Viral fasta index not found: ${params.viral_index}" }
+        .into { viral_index_files,viral_index_files_variant_calling }
+}
+
 
 // Header log info
 log.info "========================================="
@@ -289,10 +290,10 @@ process mapping_host {
   file index from host_index_files.collect()
 
 	output:
-	file '*_sorted.bam' into mapping_host_sorted_bam_host
-  file '*.bam.bai' into mapping_host_bai_host
-	file '*_flagstat.txt' into mapping_host_flagstat_host
-	file '*.stats' into mapping_host_picardstats_host
+	file '*_sorted.bam' into mapping_host_sorted_bam
+  file '*.bam.bai' into mapping_host_bai
+	file '*_flagstat.txt' into mapping_host_flagstat
+	file '*.stats' into mapping_host_picardstats
 
 	script:
 	prefix = readsR1.toString() - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_trimmed)?(_val_1)?(_00*)?(\.fq)?(\.fastq)?(\.gz)?$/
@@ -328,10 +329,10 @@ process mapping_virus {
   file index from viral_index_files.collect()
 
 	output:
-	file '*_sorted.bam' into mapping_host_sorted_bam_virus
-  file '*.bam.bai' into mapping_host_bai_virus
-	file '*_flagstat.txt' into mapping_host_flagstat_virus
-	file '*.stats' into mapping_host_picardstats_virus
+	file '*_sorted.bam' into mapping_virus_sorted_bam,mapping_virus_sorted_bam_variant_calling
+  file '*.bam.bai' into mapping_virus_bai,mapping_virus_bai_variant_calling
+	file '*_flagstat.txt' into mapping_virus_flagstat
+	file '*.stats' into mapping_virus_picardstats
 
 	script:
 	prefix = readsR1.toString() - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_trimmed)?(_val_1)?(_00*)?(\.fq)?(\.fastq)?(\.gz)?$/
@@ -342,5 +343,38 @@ process mapping_virus {
   samtools index $prefix"_sorted.bam"
   samtools flagstat $prefix"_sorted.bam" > $prefix"_flagstat.txt"
   picard CollectWgsMetrics COVERAGE_CAP=1000000 I=$prefix"_sorted.bam" O=$prefix".stats" R=$refvirus
+	"""
+}
+
+/*
+ * STEPS 3.1 Variant Calling
+ */
+process variant_calling {
+	tag "$prefix"
+	publishDir "${params.outdir}/06-variant_calling", mode: 'copy',
+		saveAs: {filename ->
+			if (filename.indexOf(".pileup") > 0) "pileup/$filename"
+			else if (filename.indexOf("_mayority.vcf") > 0) "majority_allele/$filename"
+      else if (filename.indexOf(".vcf") > 0) "lowfreq_vars/$filename"
+			else params.saveTrimmed ? filename : null
+	}
+
+	input:
+	set val(name), file(sorted_bam) from mapping_virus_sorted_bam_variant_calling
+  file bam_index from mapping_virus_bai_variant_calling
+  file refvirus from viral_fasta_file
+  file index from viral_index_files_variant_calling.collect()
+
+	output:
+	file '*.pileup' into variant_calling_pileup
+  file '*_mayority.vcf' into majority_allele_vcf
+	file '*.vcf' into lowfreq_variants_vcf
+
+	script:
+	prefix = name - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_sorted)?(_val_1)?(_00*)?(\.bam)?(\.fastq)?(\.gz)?$/
+	"""
+  samtools mpileup -A -d 20000 -Q 0 -f $refvirus $sorted_bam > $prefix".pileup"
+  varscan mpileup2cns $prefix".pileup" --min-var-freq 0.02 --p-value 0.99 --variants --output-vcf 1 > $prefix".vcf"
+  varscan mpileup2cns $prefix".pileup" --min-var-freq 0.8 --p-value 0.05 --variants --output-vcf 1 > $prefix"_mayority.vcf"
 	"""
 }
