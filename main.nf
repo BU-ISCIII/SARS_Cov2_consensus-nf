@@ -296,7 +296,7 @@ process mapping_host {
 	file '*.stats' into mapping_host_picardstats
 
 	script:
-	prefix = readsR1.toString() - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_trimmed)?(_val_1)?(_00*)?(\.fq)?(\.fastq)?(\.gz)?$/
+	prefix = readsR1.toString() - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_paired)?(_val_1)?(_00*)?(\.fq)?(\.fastq)?(\.gz)?$/
 	"""
 	bwa mem -t 10 $refhost $readsR1 $readsR2 > $prefix".sam"
   samtools view -b $prefix".sam" > $prefix".bam"
@@ -335,7 +335,7 @@ process mapping_virus {
 	file '*.stats' into mapping_virus_picardstats
 
 	script:
-	prefix = readsR1.toString() - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_trimmed)?(_val_1)?(_00*)?(\.fq)?(\.fastq)?(\.gz)?$/
+	prefix = readsR1.toString() - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_paired)?(_val_1)?(_00*)?(\.fq)?(\.fastq)?(\.gz)?$/
 	"""
 	bwa mem -t 10 $refvirus $readsR1 $readsR2 > $prefix".sam"
   samtools view -b $prefix".sam" > $prefix".bam"
@@ -360,7 +360,7 @@ process variant_calling {
 	}
 
 	input:
-	set val(name), file(sorted_bam) from mapping_virus_sorted_bam_variant_calling
+	file sorted_bam from mapping_virus_sorted_bam_variant_calling
   file bam_index from mapping_virus_bai_variant_calling
   file refvirus from viral_fasta_file
   file index from viral_index_files_variant_calling.collect()
@@ -371,7 +371,7 @@ process variant_calling {
 	file '*.vcf' into lowfreq_variants_vcf
 
 	script:
-	prefix = name - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_sorted)?(_val_1)?(_00*)?(\.bam)?(\.fastq)?(\.gz)?$/
+	prefix = sorted_bam.baseName - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_sorted)?(_val_1)?(_00*)?(\.bam)?(\.fastq)?(\.gz)?$/
 	"""
   samtools mpileup -A -d 20000 -Q 0 -f $refvirus $sorted_bam > $prefix".pileup"
   varscan mpileup2cns $prefix".pileup" --min-var-freq 0.02 --p-value 0.99 --variants --output-vcf 1 > $prefix".vcf"
