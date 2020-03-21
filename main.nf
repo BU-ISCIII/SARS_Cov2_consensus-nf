@@ -335,7 +335,7 @@ process mapping_virus {
 	file '*.stats' into mapping_virus_picardstats
 
 	script:
-	prefix = readsR1.toString() - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_paired)?(_val_1)?(_00*)?(\.fq)?(\.fastq)?(\.gz)?$/
+	prefix = readsR1.toString() - ~/(.R1)?(_1)?(_R1)?(_paired)?(\.fq)?(\.fastq)?(\.gz)?$/
 	"""
 	bwa mem -t 10 $refvirus $readsR1 $readsR2 > $prefix".sam"
   samtools view -b $prefix".sam" > $prefix".bam"
@@ -405,7 +405,7 @@ process variant_calling_annotation {
 
 /*
  * STEPS 3.3 Consensus Genome
- */
+
 process genome_consensus {
   tag "$prefix"
   publishDir path: { "${params.outdir}/08-mapping_consensus" }, mode: 'copy'
@@ -418,7 +418,7 @@ process genome_consensus {
   file '*_consensus.fasta' into consensus_fasta
 
   script:
-  prefix = variants.baseName - ~/(_S[0-9]{2})?(_lowfreq)?(.R1)?(_1)?(_R1)?(_sorted)?(_paired)?(_00*)?(\.bam)?(\.vcf)?(\.gz)?$/
+  prefix = variants.baseName - ~/(_lowfreq)?(_paired)?(\.vcf)?(\.gz)?$/
   refname = refvirus.baseName - ~/(\.2)?(\.fasta)?$/
   """
   bgzip -c $variants > $prefix"_"$refname".vcf.gz"
@@ -426,3 +426,6 @@ process genome_consensus {
   cat $refvirus | bcftools consensus $prefix"_"$refname".vcf.gz" > $prefix"_"$refname"_consensus.fasta"
   """
 }
+ */
+
+ 
