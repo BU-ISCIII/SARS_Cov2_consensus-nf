@@ -368,13 +368,13 @@ process variant_calling {
 	output:
 	file '*.pileup' into variant_calling_pileup
   file '*_mayority.vcf' into majority_allele_vcf
-	file '*.vcf' into lowfreq_variants_vcf,lowfreq_variants_vcf_annotation
+	file '*_lowfreq.vcf' into lowfreq_variants_vcf,lowfreq_variants_vcf_annotation
 
 	script:
-	prefix = sorted_bam.baseName - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_sorted)?(_val_1)?(_00*)?(\.bam)?(\.fastq)?(\.gz)?$/
+	prefix = sorted_bam.baseName - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_sorted)?(_paired)?(_00*)?(\.bam)?(\.fastq)?(\.gz)?$/
 	"""
   samtools mpileup -A -d 20000 -Q 0 -f $refvirus $sorted_bam > $prefix".pileup"
-  varscan mpileup2cns $prefix".pileup" --min-var-freq 0.02 --p-value 0.99 --variants --output-vcf 1 > $prefix".vcf"
+  varscan mpileup2cns $prefix".pileup" --min-var-freq 0.02 --p-value 0.99 --variants --output-vcf 1 > $prefix"_lowfreq.vcf"
   varscan mpileup2cns $prefix".pileup" --min-var-freq 0.8 --p-value 0.05 --variants --output-vcf 1 > $prefix"_mayority.vcf"
 	"""
 }
@@ -382,7 +382,7 @@ process variant_calling {
 /*
  * STEPS 3.2 Variant Calling annotation
  */
-process variant_calling {
+process variant_calling_annotation {
  	tag "$prefix"
  	publishDir path: { "${params.outdir}/07-annotation" }, mode: 'copy'
 
@@ -395,8 +395,8 @@ process variant_calling {
  	file 'snpEff_summary.html' into snpeff_summary
 
  	script:
- 	prefix = variants.baseName - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_sorted)?(_paired)?(_00*)?(\.bam)?(\.vcf)?(\.gz)?$/
+ 	prefix = variants.baseName - ~/(_S[0-9]{2})?(_lowfreq)?(.R1)?(_1)?(_R1)?(_sorted)?(_paired)?(_00*)?(\.bam)?(\.vcf)?(\.gz)?$/
  	"""
-  snpEff sars-cov-2 $variants > $prefix.ann.vcf
+  snpEff sars-cov-2 $variants > $prefix".ann.vcf"
  	"""
  }
