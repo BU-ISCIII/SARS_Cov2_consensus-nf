@@ -244,8 +244,8 @@ process trimming {
 		saveAs: {filename ->
 			if (filename.indexOf("_fastqc") > 0) "../03-preprocQC/$filename"
 			else if (filename.indexOf(".log") > 0) "logs/$filename"
-      else if (filename.indexOf(".fastq.gz") > 0) "trimmed/$filename"
-			else params.saveTrimmed ? filename : null
+      else if (params.saveTrimmed && filename.indexOf(".fastq.gz")) "trimmed/$filename"
+			else null
 	}
 
 	input:
@@ -295,7 +295,7 @@ process mapping_host {
 	file '*.stats' into mapping_host_picardstats
 
 	script:
-	prefix = readsR1.toString() - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_paired)?(_val_1)?(_00*)?(\.fq)?(\.fastq)?(\.gz)?$/
+	prefix = readsR1.toString() - '_paired_R1.fastq.gz'
 	"""
 	bwa mem -t 10 $refhost $readsR1 $readsR2 > $prefix".sam"
   samtools view -b $prefix".sam" > $prefix".bam"
@@ -333,7 +333,7 @@ process mapping_virus {
 	file '*.stats' into mapping_virus_picardstats
 
 	script:
-	prefix = readsR1.toString() - ~/(.R1)?(_1)?(_R1)?(_paired)?(\.fq)?(\.fastq)?(\.gz)?$/
+  prefix = readsR1.toString() - '_paired_R1.fastq.gz'
 	"""
 	bwa mem -t 10 $refvirus $readsR1 $readsR2 > $prefix".sam"
   samtools view -b $prefix".sam" > $prefix".bam"
@@ -429,11 +429,12 @@ process genome_consensus {
 /*
  * STEPS 4.1 Select unmapped host reads
  */
-process spades_assembly {
+process unmapped_host {
   tag "$prefix"
-  publishDir "${params.outdir}/09-assembly/unmapped", mode: 'copy',
+  publishDir "${params.outdir}/09-assembly", mode: 'copy',
     saveAs: {filename ->
-      if ( params.save_unmapped_host ) filename : null
+      if (params.save_unmapped_host) "unmapped/$filename"
+      else null
   }
 
   input:
@@ -456,22 +457,73 @@ process spades_assembly {
 
 /*
  * STEPS 4.2 De Novo Spades Assembly
-
+ */
 process spades_assembly {
   tag "$prefix"
   publishDir path: { "${params.outdir}/09-assembly/spades" }, mode: 'copy'
 
+  cpus '10'
+  penv 'openmp'
+
   input:
-  file variants from lowfreq_variants_vcf_consensus
-  file refvirus from viral_fasta_file
+  set file(readsR1),file(readsR2) from unmapped_host_reads_spades
 
   output:
   file '*_scaffolds.fasta' into spades_scaffold
 
   script:
-  prefix = variants.baseName - ~/(_lowfreq)?(_paired)?(\.vcf)?(\.gz)?$/
-  refname = refvirus.baseName - ~/(\.2)?(\.fasta)?$/
+  prefix = variants.baseName - ~/(_unmapped)?(_paired)?(\.vcf)?(\.fastq)?$/
   """
+  spades.py -t 10 -1 $readsR1 -2 $readsR2 -o ./
+  mv scaffolds.fasta $prefix"_scaffolds.fasta"
+  """
+}
 
+/*
+ * STEPS 4.2 De Novo MetaSpades Assembly
+
+process metaspades_assembly {
+  tag "$prefix"
+  publishDir path: { "${params.outdir}/09-assembly/metaspades" }, mode: 'copy'
+
+  cpus '10'
+  penv 'openmp'
+
+  input:
+  set file(readsR1),file(readsR2) from unmapped_host_reads_metaspades
+
+  output:
+  file '*_meta_scaffolds.fasta' into metaspades_scaffold
+
+  script:
+  prefix = variants.baseName - ~/(_unmapped)?(_paired)?(\.vcf)?(\.fastq)?$/
   """
+  spades.py -t 10 -1 $readsR1 -2 $readsR2 --meta -o ./
+  mv scaffolds.fasta $prefix"_meta_scaffolds.fasta"
+  """
+}
+ */
+
+/*
+ * STEPS 4.3 De Novo Unicycler Assembly
+
+process unicycler_assembly {
+  tag "$prefix"
+  publishDir path: { "${params.outdir}/09-assembly/unicycler" }, mode: 'copy'
+
+  cpus '10'
+  penv 'openmp'
+
+  input:
+  set file(readsR1),file(readsR2) from unmapped_host_reads_metaspades
+
+  output:
+  file '*_meta_scaffolds.fasta' into metaspades_scaffold
+
+  script:
+  prefix = variants.baseName - ~/(_unmapped)?(_paired)?(\.vcf)?(\.fastq)?$/
+  """
+  unicycler -t 10 -o $prefix -1 ../02-preprocessing/%/%_R1_filtered.fastq.gz -2 ../02-preprocessing/%/%_R2_filtered.fastq.gz
+  """
+}
  */
