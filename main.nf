@@ -368,7 +368,7 @@ process variant_calling {
 	output:
 	file '*.pileup' into variant_calling_pileup
   file '*_mayority.vcf' into majority_allele_vcf
-	file '*_lowfreq.vcf' into lowfreq_variants_vcf,lowfreq_variants_vcf_annotation
+	file '*_lowfreq.vcf' into lowfreq_variants_vcf,lowfreq_variants_vcf_annotation,lowfreq_variants_vcf_consensus
 
 	script:
 	prefix = sorted_bam.baseName - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_sorted)?(_paired)?(_00*)?(\.bam)?(\.fastq)?(\.gz)?$/
@@ -401,4 +401,28 @@ process variant_calling_annotation {
   mv snpEff_genes.txt $prefix"_snpEff_genes.txt"
   mv snpEff_summary.html $prefix"_snpEff_summary.html"
  	"""
- }
+}
+
+/*
+ * STEPS 3.3 Consensus Genome
+ */
+process genome_consensus {
+  tag "$prefix"
+  publishDir path: { "${params.outdir}/07-annotation" }, mode: 'copy'
+
+  input:
+  file variants from lowfreq_variants_vcf_consensus
+  file refvirus from viral_fasta_file
+
+  output:
+  file '*_consensus.fasta' into consensus_fasta
+
+  script:
+  prefix = variants.baseName - ~/(_S[0-9]{2})?(_lowfreq)?(.R1)?(_1)?(_R1)?(_sorted)?(_paired)?(_00*)?(\.bam)?(\.vcf)?(\.gz)?$/
+  refname = refvirus.baseName - ~/(\.2)?(\.fasta)?$/
+  """
+  bgzip -c $variants > $prefix"_"$refname".vcf.gz"
+  bcftools index $prefix"_"$refname".vcf.gz"
+  cat $refvirus | bcftools consensus $prefix"_"$refname".vcf.gz" > $prefix"_"$refname"_consensus.fasta"
+  """
+}
