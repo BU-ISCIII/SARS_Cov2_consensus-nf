@@ -368,7 +368,7 @@ process variant_calling {
 	output:
 	file '*.pileup' into variant_calling_pileup
   file '*_mayority.vcf' into majority_allele_vcf
-	file '*.vcf' into lowfreq_variants_vcf
+	file '*.vcf' into lowfreq_variants_vcf,lowfreq_variants_vcf_annotation
 
 	script:
 	prefix = sorted_bam.baseName - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_sorted)?(_val_1)?(_00*)?(\.bam)?(\.fastq)?(\.gz)?$/
@@ -378,3 +378,25 @@ process variant_calling {
   varscan mpileup2cns $prefix".pileup" --min-var-freq 0.8 --p-value 0.05 --variants --output-vcf 1 > $prefix"_mayority.vcf"
 	"""
 }
+
+/*
+ * STEPS 3.2 Variant Calling annotation
+ */
+process variant_calling {
+ 	tag "$prefix"
+ 	publishDir path: { "${params.outdir}/07-annotation" }, mode: 'copy'
+
+ 	input:
+ 	file variants from lowfreq_variants_vcf_annotation
+
+ 	output:
+ 	file '*.ann.vcf' into annotated_variants
+  file 'snpEff_genes.txt' into snpeff_genes
+ 	file 'snpEff_summary.html' into snpeff_summary
+
+ 	script:
+ 	prefix = variants.baseName - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_sorted)?(_paired)?(_00*)?(\.bam)?(\.vcf)?(\.gz)?$/
+ 	"""
+  snpEff sars-cov-2 $variants > $prefix.ann.vcf
+ 	"""
+ }
