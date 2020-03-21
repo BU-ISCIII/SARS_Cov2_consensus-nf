@@ -408,7 +408,7 @@ process variant_calling_annotation {
  */
 process genome_consensus {
   tag "$prefix"
-  publishDir path: { "${params.outdir}/07-annotation" }, mode: 'copy'
+  publishDir path: { "${params.outdir}/08-mapping_consensus" }, mode: 'copy'
 
   input:
   file variants from lowfreq_variants_vcf_consensus
