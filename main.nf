@@ -391,12 +391,14 @@ process variant_calling_annotation {
 
  	output:
  	file '*.ann.vcf' into annotated_variants
-  file 'snpEff_genes.txt' into snpeff_genes
- 	file 'snpEff_summary.html' into snpeff_summary
+  file '*_snpEff_genes.txt' into snpeff_genes
+ 	file '*_snpEff_summary.html' into snpeff_summary
 
  	script:
  	prefix = variants.baseName - ~/(_S[0-9]{2})?(_lowfreq)?(.R1)?(_1)?(_R1)?(_sorted)?(_paired)?(_00*)?(\.bam)?(\.vcf)?(\.gz)?$/
  	"""
   snpEff sars-cov-2 $variants > $prefix".ann.vcf"
+  mv snpEff_genes.txt $prefix"_snpEff_genes.txt"
+  mv snpEff_summary.html $prefix"_snpEff_summary.html"
  	"""
  }
