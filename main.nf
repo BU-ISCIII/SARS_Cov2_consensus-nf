@@ -472,7 +472,7 @@ process spades_assembly {
   file '*_scaffolds.fasta' into spades_scaffold
 
   script:
-  prefix = variants.baseName - ~/(_unmapped)?(_paired)?(\.vcf)?(\.fastq)?$/
+  prefix = readsR1.toString() - '_unmapped.fastq'
   """
   spades.py -t 10 -1 $readsR1 -2 $readsR2 -o ./
   mv scaffolds.fasta $prefix"_scaffolds.fasta"
@@ -496,7 +496,7 @@ process metaspades_assembly {
   file '*_meta_scaffolds.fasta' into metaspades_scaffold
 
   script:
-  prefix = variants.baseName - ~/(_unmapped)?(_paired)?(\.vcf)?(\.fastq)?$/
+  prefix = readsR1.toString() - '_unmapped.fastq'
   """
   spades.py -t 10 -1 $readsR1 -2 $readsR2 --meta -o ./
   mv scaffolds.fasta $prefix"_meta_scaffolds.fasta"
@@ -521,7 +521,7 @@ process unicycler_assembly {
   file '*_meta_scaffolds.fasta' into metaspades_scaffold
 
   script:
-  prefix = variants.baseName - ~/(_unmapped)?(_paired)?(\.vcf)?(\.fastq)?$/
+  prefix = readsR1.toString() - '_unmapped.fastq'
   """
   unicycler -t 10 -o $prefix -1 ../02-preprocessing/%/%_R1_filtered.fastq.gz -2 ../02-preprocessing/%/%_R2_filtered.fastq.gz
   """
