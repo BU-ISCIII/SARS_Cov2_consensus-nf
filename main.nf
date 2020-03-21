@@ -67,6 +67,7 @@ def helpMessage() {
       --trimmomatic_mininum_length  Minimum length of reads
 
     Other options:
+      --save_unmapped_host          Save the reads that didn't map to host genome
       --outdir                      The output directory where the results will be saved
     """.stripIndent()
 }
@@ -172,9 +173,7 @@ def summary = [:]
 summary['Reads']               = params.reads
 summary['Data Type']           = params.singleEnd ? 'Single-End' : 'Paired-End'
 summary['Fasta Ref']           = params.viral_fasta
-summary['GFF File']            = viral_gff
-summary['Keep Duplicates']     = params.keepduplicates
-summary['Step']                = params.step
+summary['GFF File']            = params.viral_gff
 summary['Container']           = workflow.container
 if(workflow.revision) summary['Pipeline Release'] = workflow.revision
 summary['Current home']        = "$HOME"
@@ -183,6 +182,7 @@ summary['Current path']        = "$PWD"
 summary['Working dir']         = workflow.workDir
 summary['Output dir']          = params.outdir
 summary['Script dir']          = workflow.projectDir
+summary['Save Unmapped']        = params.save_unmapped_host
 summary['Save Trimmed']        = params.saveTrimmed
 if( params.notrim ){
     summary['Trimming Step'] = 'Skipped'
@@ -279,7 +279,6 @@ process mapping_host {
 			else if (filename.indexOf(".bai") > 0) "mapping/$filename"
       else if (filename.indexOf(".txt") > 0) "stats/$filename"
       else if (filename.indexOf(".stats") > 0) "stats/$filename"
-			else params.saveTrimmed ? filename : null
 	}
   cpus '10'
   penv 'openmp'
@@ -290,8 +289,8 @@ process mapping_host {
   file index from host_index_files.collect()
 
 	output:
-	file '*_sorted.bam' into mapping_host_sorted_bam
-  file '*.bam.bai' into mapping_host_bai
+	file '*_sorted.bam' into mapping_host_sorted_bam,mapping_host_sorted_bam_assembly
+  file '*.bam.bai' into mapping_host_bai,mapping_host_bai_assembly
 	file '*_flagstat.txt' into mapping_host_flagstat
 	file '*.stats' into mapping_host_picardstats
 
@@ -318,7 +317,6 @@ process mapping_virus {
 			else if (filename.indexOf(".bai") > 0) "mapping/$filename"
       else if (filename.indexOf(".txt") > 0) "stats/$filename"
       else if (filename.indexOf(".stats") > 0) "stats/$filename"
-			else params.saveTrimmed ? filename : null
 	}
   cpus '10'
   penv 'openmp'
@@ -428,4 +426,52 @@ process genome_consensus {
 }
  */
 
- 
+/*
+ * STEPS 4.1 Select unmapped host reads
+ */
+process spades_assembly {
+  tag "$prefix"
+  publishDir "${params.outdir}/09-assembly/unmapped", mode: 'copy',
+    saveAs: {filename ->
+      if ( params.save_unmapped_host ) filename : null
+  }
+
+  input:
+  file sorted_bam from mapping_host_sorted_bam_assembly
+  file bam_bai from mapping_host_bai_assembly
+
+  output:
+  file '*_unmapped.bam' into unmapped_host_bam
+  file '*_unmapped_qsorted.bam' into unmapped_host_qsorted_bam
+  file '*_unmapped.fastq' into unmapped_host_reads,unmapped_host_reads_spades,unmapped_host_reads_metaspades,unmapped_host_reads_unicycler
+
+  script:
+  prefix = sorted_bam.baseName - ~/(_sorted)?(_paired)?(\.bam)?(\.gz)?$/
+  """
+  samtools view -b -f 4 $sorted_bam > $prefix"_unmapped.bam"
+  samtools sort -n $prefix"_unmapped.bam" -o $prefix"_unmapped_qsorted.bam"
+  bedtools bamtofastq -i $prefix"_unmapped_qsorted.bam" -fq $prefix"_R1_unmapped.fastq" -fq2 $prefix"_R2_unmapped.fastq"
+  """
+}
+
+/*
+ * STEPS 4.2 De Novo Spades Assembly
+
+process spades_assembly {
+  tag "$prefix"
+  publishDir path: { "${params.outdir}/09-assembly/spades" }, mode: 'copy'
+
+  input:
+  file variants from lowfreq_variants_vcf_consensus
+  file refvirus from viral_fasta_file
+
+  output:
+  file '*_scaffolds.fasta' into spades_scaffold
+
+  script:
+  prefix = variants.baseName - ~/(_lowfreq)?(_paired)?(\.vcf)?(\.gz)?$/
+  refname = refvirus.baseName - ~/(\.2)?(\.fasta)?$/
+  """
+
+  """
+ */
