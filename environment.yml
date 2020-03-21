@@ -11,6 +11,7 @@ dependencies:
   - picard=2.18.27
   - samtools=1.9
   - bwa=0.7.12
+  - bedtools=2.26.0
   - spades=3.14.0-0
   - quast=5.0.1
   - blast=2.9.0-0
