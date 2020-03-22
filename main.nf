@@ -506,7 +506,7 @@ process metaspades_assembly {
 
 /*
  * STEPS 4.3 De Novo Unicycler Assembly
-
+ */
 process unicycler_assembly {
   tag "$prefix"
   publishDir path: { "${params.outdir}/09-assembly/unicycler" }, mode: 'copy'
@@ -515,15 +515,15 @@ process unicycler_assembly {
   penv 'openmp'
 
   input:
-  set file(readsR1),file(readsR2) from unmapped_host_reads_metaspades
+  set file(readsR1),file(readsR2) from unmapped_host_reads_unicycler
 
   output:
-  file '*_meta_scaffolds.fasta' into metaspades_scaffold
+  file '*_assembly.fasta' into unicycler_assembly
 
   script:
   prefix = readsR1.toString() - '_R1_unmapped.fastq'
   """
-  unicycler -t 10 -o $prefix -1 ../02-preprocessing/%/%_R1_filtered.fastq.gz -2 ../02-preprocessing/%/%_R2_filtered.fastq.gz
+  unicycler -t 10 -o $prefix -1 $readsR1 -2 $readsR2
+  mv assembly.fasta $prefix"_assembly.fasta"
   """
 }
- */
