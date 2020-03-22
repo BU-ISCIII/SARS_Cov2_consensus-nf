@@ -493,7 +493,7 @@ process metaspades_assembly {
   set file(readsR1),file(readsR2) from unmapped_host_reads_metaspades
 
   output:
-  file '*_meta_scaffolds.fasta' into metaspades_scaffold
+  file '*_meta_scaffolds.fasta' into metaspades_scaffold,metaspades_scaffold_quast
 
   script:
   prefix = readsR1.toString() - '_R1_unmapped.fastq'
@@ -523,7 +523,35 @@ process unicycler_assembly {
   script:
   prefix = readsR1.toString() - '_R1_unmapped.fastq'
   """
-  unicycler -t 10 -o $prefix -1 $readsR1 -2 $readsR2
+  unicycler -t 10 -1 $readsR1 -2 $readsR2
   mv assembly.fasta $prefix"_assembly.fasta"
   """
 }
+
+/*
+ * STEPS 4.4 Spades Assembly Quast
+
+process spades_quast {
+  tag "$prefix"
+  publishDir path: { "${params.outdir}/09-assembly/" }, mode: 'copy'
+
+  cpus '10'
+  penv 'openmp'
+
+  input:
+  file scaffolds from spades_scaffold_quast.collect()
+  file meta_scaffolds from metaspades_scaffold_quast
+  file refvirus from viral_fasta_file
+  file viral_gff from gff_file
+
+  output:
+  file "spades_quast" into spades_quast_resuts
+	file "spades_quast/latest/report.tsv" into spades_quast_resuts_multiqc
+
+  script:
+  prefix = 'spades_quast'
+  """
+  quast.py --output_dir $prefix -R $refvirus -G $viral_gff -t 10 $(find . -name "*_scaffolds.fasta" | tr '\n' ' ')
+  """
+}
+ */
