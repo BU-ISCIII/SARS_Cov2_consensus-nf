@@ -13,6 +13,7 @@ dependencies:
   - bwa=0.7.12
   - bedtools=2.26.0
   - spades=3.14.0-0
+  - unicycler=0.4.6
   - quast=5.0.1
   - blast=2.9.0-0
   - varscan=2.4.4-0
