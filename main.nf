@@ -523,7 +523,7 @@ process unicycler_assembly {
   script:
   prefix = readsR1.toString() - '_R1_unmapped.fastq'
   """
-  unicycler -t 10 -1 $readsR1 -2 $readsR2
+  unicycler -t 10 -o ./ -1 $readsR1 -2 $readsR2
   mv assembly.fasta $prefix"_assembly.fasta"
   """
 }
