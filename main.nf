@@ -107,7 +107,7 @@ if( params.host_fasta ){
 // GFF file
 viral_gff = false
 
-if( viral_gff ){
+if( params.viral_gff ){
     gff_file = file(viral_gff)
     if( !gff_file.exists() ) exit 1, "GFF file not found: ${viral_gff}."
 }
