@@ -557,7 +557,7 @@ process spades_quast {
 
 /*
  * STEPS 4.4 Unicycler Assembly Quast
-
+ */
 process unicycler_quast {
   tag "$prefix"
   publishDir path: { "${params.outdir}/09-assembly/" }, mode: 'copy'
@@ -577,7 +577,6 @@ process unicycler_quast {
   script:
   prefix = 'unicycler_quast'
   """
-  quast.py --output-dir $prefix -R $refvirus -G $viral_gff -t 10 \$(find . -name "*_scaffolds.fasta" | tr '\n' ' ')
+  quast.py --output-dir $prefix -R $refvirus -G $viral_gff -t 10 \$(find . -name "*_assembly.fasta" | tr '\n' ' ')
   """
 }
- */
