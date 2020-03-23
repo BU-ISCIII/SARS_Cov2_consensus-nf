@@ -44,7 +44,7 @@ def helpMessage() {
 
     The typical command for running the pipeline is as follows:
 
-    nextflow run SARS_Cov2-nf/main.nf --reads '*_R{1,2}.fastq.gz' --viral_fasta ../../REFERENCES/NC_045512.2.fasta --viral_gff ../../REFERENCES/NC_045512.2.gff --viral_index '../REFERENCES/NC_045512.2.fasta.*' --host_fasta ../REFERENCES/hg38.fasta --host_index '/processing_Data/bioinformatics/references/eukaria/homo_sapiens/hg38/UCSC/genome/hg38.fullAnalysisSet.fa.*' --outdir ./ -profile hpc_isciii
+    nextflow run SARS_Cov2-nf/main.nf --reads '*_R{1,2}.fastq.gz' --viral_fasta ../../REFERENCES/NC_045512.2.fasta --viral_gff ../../REFERENCES/NC_045512.2.gff --viral_index '../REFERENCES/NC_045512.2.fasta.*' --blast_db '../REFERENCES/NC_045512.2.fasta.*' --host_fasta ../REFERENCES/hg38.fasta --host_index '/processing_Data/bioinformatics/references/eukaria/homo_sapiens/hg38/UCSC/genome/hg38.fullAnalysisSet.fa.*' --outdir ./ -profile hpc_isciii
 
     Mandatory arguments:
       --reads                       Path to input data (must be surrounded with quotes).
@@ -53,6 +53,7 @@ def helpMessage() {
       --viral_index                 Path to viral fasta index
       --host_fasta                  Path to host Fasta sequence
       --host_index                  Path to host fasta index
+      --blast_db                    Path to reference viral genome BLAST database
 
     Options:
       --singleEnd                   Specifies that the input is single end reads
@@ -163,6 +164,16 @@ if( params.viral_index ){
         .ifEmpty { exit 1, "Viral fasta index not found: ${params.viral_index}" }
         .into { viral_index_files; viral_index_files_variant_calling }
 }
+
+if( params.blast_db ){
+    Channel
+        .fromPath(params.blast_db)
+        .ifEmpty { exit 1, "Viral fasta index not found: ${params.blast_db}" }
+        .into { blast_db_files; blast_db_files }
+}
+
+Channel.fromPath("$baseDir/assets/header")
+       .into{ blast_header }
 
 
 // Header log info
@@ -469,7 +480,7 @@ process spades_assembly {
   set file(readsR1),file(readsR2) from unmapped_host_reads_spades
 
   output:
-  file '*_scaffolds.fasta' into spades_scaffold,spades_scaffold_quast,spades_scaffold_abacas
+  file '*_scaffolds.fasta' into spades_scaffold,spades_scaffold_quast,spades_scaffold_abacas,spades_scaffold_blast
 
   script:
   prefix = readsR1.toString() - '_R1_unmapped.fastq'
@@ -616,5 +627,32 @@ process abacas {
   mv nucmer.filtered.delta $prefix"_abacas_nucmer.filtered.delta"
   mv nucmer.tiling $prefix"_abacas_nucmer.tiling"
   mv unused_contigs.out $prefix"_abacas_unused_contigs.out"
+  """
+}
+
+/*
+ * STEPS 5.1 BLAST
+ */
+process blast {
+  tag "$prefix"
+  publishDir path: { "${params.outdir}/11-blast" }, mode: 'copy'
+
+  cpus '10'
+  penv 'openmp'
+
+  input:
+  file scaffolds from spades_scaffold_blast
+  file blast_db from blast_db_files.collect()
+  file header from blast_header
+
+  output:
+  file "*_blast_filt_header.txt" into blast_results
+
+  script:
+  prefix = scaffolds.baseName - ~/(_scaffolds)?(_paired)?(\.fasta)?(\.gz)?$/
+  database = blast_db[1].toString()
+  """
+  blastn -num_threads 10 -db $database -query scaffolds -outfmt \'6 stitle std slen qlen qcovs\' -out $prefix_blast.txt
+  awk 'BEGIN{OFS=\"\\t\";FS=\"\\t\"}{print \$0,\$5/\$15,\$5/\$14}' $prefix"_blast.txt" | awk 'BEGIN{OFS=\"\\t\";FS=\"\\t\"} \$15 > 200 && \$17 > 0.7 && \$1 !~ /phage/ {print \$0}' > $prefix"_blast_filt.txt"; cat $header $prefix"_blast_filt.txt" > $prefix"_blast_filt_header.txt"
   """
 }
