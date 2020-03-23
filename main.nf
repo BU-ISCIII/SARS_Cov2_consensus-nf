@@ -530,7 +530,7 @@ process unicycler_assembly {
 
 /*
  * STEPS 4.4 Spades Assembly Quast
-
+ */
 process spades_quast {
   tag "$prefix"
   publishDir path: { "${params.outdir}/09-assembly/" }, mode: 'copy'
@@ -540,7 +540,7 @@ process spades_quast {
 
   input:
   file scaffolds from spades_scaffold_quast.collect()
-  file meta_scaffolds from metaspades_scaffold_quast
+  file meta_scaffolds from metaspades_scaffold_quast.collect()
   file refvirus from viral_fasta_file
   file viral_gff from gff_file
 
@@ -554,4 +554,3 @@ process spades_quast {
   quast.py --output_dir $prefix -R $refvirus -G $viral_gff -t 10 $(find . -name "*_scaffolds.fasta" | tr '\n' ' ')
   """
 }
- */
