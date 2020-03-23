@@ -518,7 +518,7 @@ process unicycler_assembly {
   set file(readsR1),file(readsR2) from unmapped_host_reads_unicycler
 
   output:
-  file '*_assembly.fasta' into unicycler_assembly
+  file '*_assembly.fasta' into unicycler_assembly,unicycler_assembly_quast
 
   script:
   prefix = readsR1.toString() - '_R1_unmapped.fastq'
@@ -546,7 +546,7 @@ process spades_quast {
 
   output:
   file "spades_quast" into spades_quast_resuts
-	file "spades_quast/latest/report.tsv" into spades_quast_resuts_multiqc
+	file "spades_quast/report.tsv" into spades_quast_resuts_multiqc
 
   script:
   prefix = 'spades_quast'
@@ -566,17 +566,16 @@ process unicycler_quast {
   penv 'openmp'
 
   input:
-  file scaffolds from spades_scaffold_quast.collect()
-  file meta_scaffolds from metas_pades_scaffold_quast.collect()
+  file assemblies from unicycler_assembly_quast.collect()
   file refvirus from viral_fasta_file
   file viral_gff from gff_file
 
   output:
-  file "spades_quast" into spades_quast_resuts
-	file "spades_quast/latest/report.tsv" into spades_quast_resuts_multiqc
+  file "unicycler_quast" into unicycler_quast_resuts
+	file "unicycler_quast/report.tsv" into unicycler_quast_resuts_multiqc
 
   script:
-  prefix = 'spades_quast'
+  prefix = 'unicycler_quast'
   """
   quast.py --output-dir $prefix -R $refvirus -G $viral_gff -t 10 \$(find . -name "*_scaffolds.fasta" | tr '\n' ' ')
   """
