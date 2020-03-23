@@ -469,7 +469,7 @@ process spades_assembly {
   set file(readsR1),file(readsR2) from unmapped_host_reads_spades
 
   output:
-  file '*_scaffolds.fasta' into spades_scaffold,spades_scaffold_quast
+  file '*_scaffolds.fasta' into spades_scaffold,spades_scaffold_quast,spades_scaffold_abacas
 
   script:
   prefix = readsR1.toString() - '_R1_unmapped.fastq'
@@ -556,7 +556,7 @@ process spades_quast {
 }
 
 /*
- * STEPS 4.4 Unicycler Assembly Quast
+ * STEPS 4.5 Unicycler Assembly Quast
  */
 process unicycler_quast {
   tag "$prefix"
@@ -578,5 +578,43 @@ process unicycler_quast {
   prefix = 'unicycler_quast'
   """
   quast.py --output-dir $prefix -R $refvirus -G $viral_gff -t 10 \$(find . -name "*_assembly.fasta" | tr '\n' ' ')
+  """
+}
+
+/*
+ * STEPS 4.6 ABACAS
+ */
+process abacas {
+  tag "$prefix"
+  publishDir "${params.outdir}/10-abacas", mode: 'copy',
+		saveAs: {filename ->
+			if (filename.indexOf("_abacas.bin") > 0) "abacas/$filename"
+			else if (filename.indexOf("_abacas.crunch") > 0) "abacas/$filename"
+      else if (filename.indexOf("_abacas.fasta") > 0) "abacas/$filename"
+      else if (filename.indexOf("_abacas.gaps") > 0) "abacas/$filename"
+      else if (filename.indexOf(".tab") > 0) "abacas/$filename"
+      else if (filename.indexOf("_abacas.MULTIFASTA.fa") > 0) "abacas/$filename"
+      else if (filename.indexOf("_abacas.gaps.tab") > 0) "abacas/$filename"
+      else if (filename.indexOf(".delta") > 0) "nucmer/$filename"
+      else if (filename.indexOf(".tiling") > 0) "nucmer/$filename"
+      else if (filename.indexOf(".out") > 0) "nucmer/$filename"
+			else filename
+	}
+  input:
+  file scaffolds from spades_scaffold_abacas
+  file refvirus from viral_fasta_file
+
+  output:
+  file "*_abacas.fasta" into abacas_fasta
+	file "*_abacas*" into abacas_results
+
+  script:
+  prefix = scaffolds.baseName - ~/(_scaffolds)?(_paired)?(\.fasta)?(\.gz)?$/
+  """
+  abacas.pl -r $refvirus -q $scaffolds -m -p nucmer -o $prefix"_abacas"
+  mv nucmer.delta $prefix"_abacas_nucmer.delta"
+  mv nucmer.filtered.delta $prefix"_abacas_nucmer.filtered.delta"
+  mv nucmer.tiling $prefix"_abacas_nucmer.tiling"
+  mv unused_contigs.out $prefix"_abacas_unused_contigs.out"
   """
 }
