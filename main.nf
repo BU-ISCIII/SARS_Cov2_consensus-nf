@@ -551,6 +551,6 @@ process spades_quast {
   script:
   prefix = 'spades_quast'
   """
-  quast.py --output_dir $prefix -R $refvirus -G $viral_gff -t 10 $(find . -name "*_scaffolds.fasta" | tr '\n' ' ')
+  quast.py --output_dir $prefix -R $refvirus -G $viral_gff -t 10 \$(find . -name "*_scaffolds.fasta" | tr '\n' ' ')
   """
 }
