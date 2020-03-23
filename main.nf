@@ -469,7 +469,7 @@ process spades_assembly {
   set file(readsR1),file(readsR2) from unmapped_host_reads_spades
 
   output:
-  file '*_scaffolds.fasta' into spades_scaffold
+  file '*_scaffolds.fasta' into spades_scaffold,spades_scaffold_quast
 
   script:
   prefix = readsR1.toString() - '_R1_unmapped.fastq'
@@ -493,7 +493,7 @@ process metaspades_assembly {
   set file(readsR1),file(readsR2) from unmapped_host_reads_metaspades
 
   output:
-  file '*_meta_scaffolds.fasta' into metaspades_scaffold,metaspades_scaffold_quast
+  file '*_meta_scaffolds.fasta' into metaspades_scaffold,metas_pades_scaffold_quast
 
   script:
   prefix = readsR1.toString() - '_R1_unmapped.fastq'
@@ -540,7 +540,7 @@ process spades_quast {
 
   input:
   file scaffolds from spades_scaffold_quast.collect()
-  file meta_scaffolds from metaspades_scaffold_quast.collect()
+  file meta_scaffolds from metas_pades_scaffold_quast.collect()
   file refvirus from viral_fasta_file
   file viral_gff from gff_file
 
