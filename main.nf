@@ -652,7 +652,7 @@ process blast {
   prefix = scaffolds.baseName - ~/(_scaffolds)?(_paired)?(\.fasta)?(\.gz)?$/
   database = blast_db[1].toString()
   """
-  blastn -num_threads 10 -db $database -query scaffolds -outfmt \'6 stitle std slen qlen qcovs\' -out $prefix_blast.txt
+  blastn -num_threads 10 -db $database -query scaffolds -outfmt \'6 stitle std slen qlen qcovs\' -out $prefix"_blast.txt"
   awk 'BEGIN{OFS=\"\\t\";FS=\"\\t\"}{print \$0,\$5/\$15,\$5/\$14}' $prefix"_blast.txt" | awk 'BEGIN{OFS=\"\\t\";FS=\"\\t\"} \$15 > 200 && \$17 > 0.7 && \$1 !~ /phage/ {print \$0}' > $prefix"_blast_filt.txt"; cat $header $prefix"_blast_filt.txt" > $prefix"_blast_filt_header.txt"
   """
 }
