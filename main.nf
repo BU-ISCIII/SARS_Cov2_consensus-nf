@@ -113,6 +113,8 @@ if( params.viral_gff ){
     if( !gff_file.exists() ) exit 1, "GFF file not found: ${viral_gff}."
 }
 
+blast_header = file("$baseDir/assets/header")
+
 // Output md template location
 output_docs = file("$baseDir/docs/output.md")
 
@@ -172,8 +174,13 @@ if( params.blast_db ){
         .into { blast_db_files; blast_db_files }
 }
 
-Channel.fromPath("$baseDir/assets/header")
-       .into{ blast_header }
+
+/*
+ * Channel.fromPath("$baseDir/assets/header")
+        .into{ blast_header }
+
+ */
+
 
 
 // Header log info
@@ -363,7 +370,7 @@ process variant_calling {
 	publishDir "${params.outdir}/06-variant_calling", mode: 'copy',
 		saveAs: {filename ->
 			if (filename.indexOf(".pileup") > 0) "pileup/$filename"
-			else if (filename.indexOf("_mayority.vcf") > 0) "majority_allele/$filename"
+			else if (filename.indexOf("_majority.vcf") > 0) "majority_allele/$filename"
       else if (filename.indexOf(".vcf") > 0) "lowfreq_vars/$filename"
 			else params.saveTrimmed ? filename : null
 	}
@@ -376,7 +383,7 @@ process variant_calling {
 
 	output:
 	file '*.pileup' into variant_calling_pileup
-  file '*_mayority.vcf' into majority_allele_vcf
+  file '*_majority.vcf' into majority_allele_vcf
 	file '*_lowfreq.vcf' into lowfreq_variants_vcf,lowfreq_variants_vcf_annotation,lowfreq_variants_vcf_consensus
 
 	script:
@@ -384,7 +391,7 @@ process variant_calling {
 	"""
   samtools mpileup -A -d 20000 -Q 0 -f $refvirus $sorted_bam > $prefix".pileup"
   varscan mpileup2cns $prefix".pileup" --min-var-freq 0.02 --p-value 0.99 --variants --output-vcf 1 > $prefix"_lowfreq.vcf"
-  varscan mpileup2cns $prefix".pileup" --min-var-freq 0.8 --p-value 0.05 --variants --output-vcf 1 > $prefix"_mayority.vcf"
+  varscan mpileup2cns $prefix".pileup" --min-var-freq 0.8 --p-value 0.05 --variants --output-vcf 1 > $prefix"_majority.vcf"
 	"""
 }
 
