@@ -429,7 +429,7 @@ process variant_calling_annotation {
 
 /*
  * STEPS 3.3 Consensus Genome
-
+ */
 process genome_consensus {
   tag "$prefix"
   publishDir path: { "${params.outdir}/08-mapping_consensus" }, mode: 'copy'
@@ -450,7 +450,7 @@ process genome_consensus {
   cat $refvirus | bcftools consensus $prefix"_"$refname".vcf.gz" > $prefix"_"$refname"_consensus.fasta"
   """
 }
- */
+
 
 /*
  * STEPS 4.1 Select unmapped host reads
