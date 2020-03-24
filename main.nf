@@ -674,7 +674,7 @@ process blast {
 
 /*
  * STEPS 6.1 plasmidID
- */
+
 process plasmidID {
   tag "$prefix"
   publishDir path: { "${params.outdir}/12-plasmidID" }, mode: 'copy'
@@ -699,3 +699,4 @@ process plasmidID {
   bash $plasmidID_file -d $refvirus -s $prefix -c unicycler_assembly -g UNICYCLER --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o ./
   """
 }
+ */
