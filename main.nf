@@ -18,6 +18,7 @@ Pipeline overview:
  	- 2.1 : BWA - Mapping to host and reference viral genome
  	- 2.2 : Samtools - SAM and BAM files processing and stats
   - 2.3 : Picard - Mapping stats
+  - 2.4 : iVar - Remove primers by coordinates.
  - 3. : Variant calling, annotation and consensus:
  	- 3.1 : VarScan - Variant calling
   - 3.2 : SnpEff - Variant Annotation
@@ -44,7 +45,7 @@ def helpMessage() {
 
     The typical command for running the pipeline is as follows:
 
-    nextflow run SARS_Cov2-nf/main.nf --reads '*_R{1,2}.fastq.gz' --viral_fasta ../../REFERENCES/NC_045512.2.fasta --viral_gff ../../REFERENCES/NC_045512.2.gff --viral_index '../REFERENCES/NC_045512.2.fasta.*' --blast_db '../REFERENCES/NC_045512.2.fasta.*' --host_fasta ../REFERENCES/hg38.fasta --host_index '/processing_Data/bioinformatics/references/eukaria/homo_sapiens/hg38/UCSC/genome/hg38.fullAnalysisSet.fa.*' --outdir ./ -profile hpc_isciii
+    nextflow run SARS_Cov2-nf/main.nf --reads '*_R{1,2}.fastq.gz' --viral_fasta ../../REFERENCES/NC_045512.2.fasta --viral_gff ../../REFERENCES/NC_045512.2.gff --viral_index '../REFERENCES/NC_045512.2.fasta.*' --blast_db '../REFERENCES/NC_045512.2.fasta.*' --host_fasta ../REFERENCES/hg38.fasta --host_index '/processing_Data/bioinformatics/references/eukaria/homo_sapiens/hg38/UCSC/genome/hg38.fullAnalysisSet.fa.*' --plasmidID '/processing_Data/bioinformatics/pipelines/plasmidID/plasmidID.sh' --outdir ./ -profile hpc_isciii
 
     Mandatory arguments:
       --reads                       Path to input data (must be surrounded with quotes).
@@ -54,6 +55,7 @@ def helpMessage() {
       --host_fasta                  Path to host Fasta sequence
       --host_index                  Path to host fasta index
       --blast_db                    Path to reference viral genome BLAST database
+      --plasmidID                   Path to plasmidID bash script
 
     Options:
       --singleEnd                   Specifies that the input is single end reads
@@ -110,8 +112,16 @@ viral_gff = false
 
 if( params.viral_gff ){
     gff_file = file(params.viral_gff)
-    if( !gff_file.exists() ) exit 1, "GFF file not found: ${viral_gff}."
+    if( !gff_file.exists() ) exit 1, "GFF file not found: ${params.viral_gff}."
 }
+
+params.plasmidID=false
+if( params.plasmidID ){
+    plasmidID_file = file(params.plasmidID)
+    if( !plasmidID_file.exists() ) exit 1, "GFF file not found: ${params.plasmidID}."
+}
+
+blast_header = file("$baseDir/assets/header")
 
 // Output md template location
 output_docs = file("$baseDir/docs/output.md")
@@ -172,8 +182,13 @@ if( params.blast_db ){
         .into { blast_db_files; blast_db_files }
 }
 
-Channel.fromPath("$baseDir/assets/header")
-       .into{ blast_header }
+
+/*
+ * Channel.fromPath("$baseDir/assets/header")
+        .into{ blast_header }
+
+ */
+
 
 
 // Header log info
@@ -363,7 +378,7 @@ process variant_calling {
 	publishDir "${params.outdir}/06-variant_calling", mode: 'copy',
 		saveAs: {filename ->
 			if (filename.indexOf(".pileup") > 0) "pileup/$filename"
-			else if (filename.indexOf("_mayority.vcf") > 0) "majority_allele/$filename"
+			else if (filename.indexOf("_majority.vcf") > 0) "majority_allele/$filename"
       else if (filename.indexOf(".vcf") > 0) "lowfreq_vars/$filename"
 			else params.saveTrimmed ? filename : null
 	}
@@ -376,7 +391,7 @@ process variant_calling {
 
 	output:
 	file '*.pileup' into variant_calling_pileup
-  file '*_mayority.vcf' into majority_allele_vcf
+  file '*_majority.vcf' into majority_allele_vcf
 	file '*_lowfreq.vcf' into lowfreq_variants_vcf,lowfreq_variants_vcf_annotation,lowfreq_variants_vcf_consensus
 
 	script:
@@ -384,7 +399,7 @@ process variant_calling {
 	"""
   samtools mpileup -A -d 20000 -Q 0 -f $refvirus $sorted_bam > $prefix".pileup"
   varscan mpileup2cns $prefix".pileup" --min-var-freq 0.02 --p-value 0.99 --variants --output-vcf 1 > $prefix"_lowfreq.vcf"
-  varscan mpileup2cns $prefix".pileup" --min-var-freq 0.8 --p-value 0.05 --variants --output-vcf 1 > $prefix"_mayority.vcf"
+  varscan mpileup2cns $prefix".pileup" --min-var-freq 0.8 --p-value 0.05 --variants --output-vcf 1 > $prefix"_majority.vcf"
 	"""
 }
 
@@ -480,7 +495,7 @@ process spades_assembly {
   set file(readsR1),file(readsR2) from unmapped_host_reads_spades
 
   output:
-  file '*_scaffolds.fasta' into spades_scaffold,spades_scaffold_quast,spades_scaffold_abacas,spades_scaffold_blast
+  file '*_scaffolds.fasta' into spades_scaffold,spades_scaffold_quast,spades_scaffold_abacas,spades_scaffold_blast,spades_scaffold_plasmid
 
   script:
   prefix = readsR1.toString() - '_R1_unmapped.fastq'
@@ -504,7 +519,7 @@ process metaspades_assembly {
   set file(readsR1),file(readsR2) from unmapped_host_reads_metaspades
 
   output:
-  file '*_meta_scaffolds.fasta' into metaspades_scaffold,metas_pades_scaffold_quast
+  file '*_meta_scaffolds.fasta' into metaspades_scaffold,metas_pades_scaffold_quast,metas_pades_scaffold_plasmid
 
   script:
   prefix = readsR1.toString() - '_R1_unmapped.fastq'
@@ -529,7 +544,7 @@ process unicycler_assembly {
   set file(readsR1),file(readsR2) from unmapped_host_reads_unicycler
 
   output:
-  file '*_assembly.fasta' into unicycler_assembly,unicycler_assembly_quast
+  file '*_assembly.fasta' into unicycler_assembly,unicycler_assembly_quast,unicycler_assembly_plasmid
 
   script:
   prefix = readsR1.toString() - '_R1_unmapped.fastq'
@@ -654,5 +669,33 @@ process blast {
   """
   blastn -num_threads 10 -db $database -query $scaffolds -outfmt \'6 stitle std slen qlen qcovs\' -out $prefix"_blast.txt"
   awk 'BEGIN{OFS=\"\\t\";FS=\"\\t\"}{print \$0,\$5/\$15,\$5/\$14}' $prefix"_blast.txt" | awk 'BEGIN{OFS=\"\\t\";FS=\"\\t\"} \$15 > 200 && \$17 > 0.7 && \$1 !~ /phage/ {print \$0}' > $prefix"_blast_filt.txt"; cat $header $prefix"_blast_filt.txt" > $prefix"_blast_filt_header.txt"
+  """
+}
+
+/*
+ * STEPS 6.1 plasmidID
+ */
+process plasmidID {
+  tag "$prefix"
+  publishDir path: { "${params.outdir}/12-plasmidID" }, mode: 'copy'
+
+  input:
+  file spades_scaffolds from spades_scaffold_plasmid
+  file meta_scaffolds from metas_pades_scaffold_plasmid
+  file unicycler_assembly form unicycler_assembly_plasmid
+  file refvirus from viral_fasta_file
+  file plasmidID_file from plasmidID_file
+
+  output:
+  file "SPADES" into plasmid_SPADES
+  file "META_SPADES" into plasmid_METASPADES
+  file "UNICYCLER" into plasmid_UNICYCLER
+
+  script:
+  prefix = spades_scaffolds.baseName - ~/(_scaffolds)?(_paired)?(\.fasta)?(\.gz)?$/
+  """
+  bash $plasmidID_file -d $refvirus -s $prefix -c spades_scaffolds -g SPADES --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o ./
+  bash $plasmidID_file -d $refvirus -s $prefix -c meta_scaffolds -g METAD_SPADES --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o ./
+  bash $plasmidID_file -d $refvirus -s $prefix -c unicycler_assembly -g UNICYCLER --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o ./
   """
 }
