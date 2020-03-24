@@ -682,7 +682,7 @@ process plasmidID {
   input:
   file spades_scaffolds from spades_scaffold_plasmid
   file meta_scaffolds from metas_pades_scaffold_plasmid
-  file unicycler_assembly form unicycler_assembly_plasmid
+  file unicycler_assembly from unicycler_assembly_plasmid
   file refvirus from viral_fasta_file
   file plasmidID_file from plasmidID_file
 
