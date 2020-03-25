@@ -711,22 +711,22 @@ process plasmidID_metaspades {
 
 /*
  * STEPS 6.1 plasmidID UNICYCLER
-
+ */
 process plasmidID_unicycler {
   tag "$prefix"
-  publishDir path: { "${params.outdir}/12-plasmidID" }, mode: 'copy'
+  publishDir path: { "${params.outdir}/12-plasmidID/UNICYCLER" }, mode: 'copy'
 
   input:
   file unicycler_assembly from unicycler_assembly_plasmid
   file refvirus from viral_fasta_file
 
   output:
-  file "UNICYCLER" into plasmid_UNICYCLER
+  file "$prefix" into plasmid_UNICYCLER
 
   script:
   prefix = unicycler_assembly.baseName - ~/(_assembly)?(_paired)?(\.fasta)?(\.gz)?$/
   """
-  bash plasmidID.sh -d $refvirus -s $prefix -c $unicycler_assembly -g UNICYCLER --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o .
+  bash plasmidID.sh -d $refvirus -s $prefix -c $unicycler_assembly --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o .
+  mv NO_GROUP/$prefix ./$prefix
   """
 }
- */
