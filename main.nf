@@ -45,7 +45,7 @@ def helpMessage() {
 
     The typical command for running the pipeline is as follows:
 
-    nextflow run SARS_Cov2-nf/main.nf --reads '*_R{1,2}.fastq.gz' --viral_fasta ../../REFERENCES/NC_045512.2.fasta --viral_gff ../../REFERENCES/NC_045512.2.gff --viral_index '../REFERENCES/NC_045512.2.fasta.*' --blast_db '../REFERENCES/NC_045512.2.fasta.*' --host_fasta ../REFERENCES/hg38.fasta --host_index '/processing_Data/bioinformatics/references/eukaria/homo_sapiens/hg38/UCSC/genome/hg38.fullAnalysisSet.fa.*' --outdir ./ -profile hpc_isciii
+    nextflow run SARS_Cov2-nf/main.nf --reads '*_R{1,2}.fastq.gz' --viral_fasta ../../REFERENCES/NC_045512.2.fasta --viral_gff ../../REFERENCES/NC_045512.2.gff --viral_index '../REFERENCES/NC_045512.2.fasta.*' --blast_db '../REFERENCES/NC_045512.2.fasta.*' --host_fasta ../REFERENCES/hg38.fasta --host_index '/processing_Data/bioinformatics/references/eukaria/homo_sapiens/hg38/UCSC/genome/hg38.fullAnalysisSet.fa.*' --amplicons_file ../REFERENCES/nCoV-2019.schemeMod.bed --outdir ./ -profile hpc_isciii
 
     Mandatory arguments:
       --reads                       Path to input data (must be surrounded with quotes).
@@ -58,6 +58,7 @@ def helpMessage() {
 
     Options:
       --singleEnd                   Specifies that the input is single end reads
+      --amplicons_file              Path to amplicons BED file.
 
     Trimming options
       --notrim                      Specifying --notrim will skip the adapter trimming step.
@@ -99,6 +100,12 @@ if( params.viral_fasta ){
     if( !viral_fasta_file.exists() ) exit 1, "Fasta file not found: ${params.viral_fasta}."
 }
 
+params.amplicons_file = false
+if( params.amplicons_file ){
+    amplicons_bed_file = file(params.amplicons_file)
+    if ( !amplicons_bed_file.exists() ) exit 1, "Amplicons BAM file not found: $params.amplicons_file"
+}
+
 params.host_fasta = false
 if( params.host_fasta ){
     host_fasta_file = file(params.host_fasta)
@@ -130,7 +137,6 @@ params.trimmomatic_adapters_parameters = "2:30:10"
 params.trimmomatic_window_length = "4"
 params.trimmomatic_window_value = "20"
 params.trimmomatic_mininum_length = "50"
-
 
 // SingleEnd option
 params.singleEnd = false
@@ -364,6 +370,40 @@ process mapping_virus {
 }
 
 /*
+ * STEPS 2.3 iVar trim primers
+ */
+if (params.amplicons_file) {
+  process ivar_trimming {
+	 tag "$prefix"
+	  publishDir path: { "${params.outdir}/05-mapping_virus/ivar" }, mode: 'copy'
+
+	  input:
+	  file sorted_bam from mapping_virus_sorted_bam_variant_calling
+    file amplicons_bed from amplicons_bed_file
+
+	  output:
+	  file '*_primertrimmed_sorted.bam' into ivar_sorted_bam,sorted_bam_variant_calling
+    file '*_primertrimmed_sorted.bam.bai' into ivar_bai,bam_bai_variant_calling
+
+	  script:
+    prefix = sorted_bam.baseName - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_sorted)?(_paired)?(_00*)?(\.bam)?(\.fastq)?(\.gz)?$/
+	  """
+    samtools view -b -F 4 $sorted_bam > $prefix"_onlymapped.bam"
+    samtools index $prefix"_onlymapped.bam"
+    ivar trim -e -i $prefix"_onlymapped.bam" -b $amplicons_bed -p $prefix"_primertrimmed" -q 15 -m 50 -s 4
+    samtools sort -o $prefix"_primertrimmed_sorted.bam" -O bam -T $prefix $prefix"_primertrimmed.bam"
+    samtools index $prefix"_primertrimmed_sorted.bam"
+	  """
+  } else {
+      mapping_virus_sorted_bam_variant_calling
+        .set {sorted_bam_variant_calling}
+      mapping_virus_bai_variant_calling
+        .set {bam_bai_variant_calling}
+  }
+}
+
+
+/*
  * STEPS 3.1 Variant Calling
  */
 process variant_calling {
@@ -377,8 +417,8 @@ process variant_calling {
 	}
 
 	input:
-	file sorted_bam from mapping_virus_sorted_bam_variant_calling
-  file bam_index from mapping_virus_bai_variant_calling
+	file sorted_bam from sorted_bam_variant_calling
+  file bam_index from bam_bai_variant_calling
   file refvirus from viral_fasta_file
   file index from viral_index_files_variant_calling.collect()
 
@@ -388,7 +428,7 @@ process variant_calling {
 	file '*_lowfreq.vcf' into lowfreq_variants_vcf,lowfreq_variants_vcf_annotation,lowfreq_variants_vcf_consensus
 
 	script:
-	prefix = sorted_bam.baseName - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_sorted)?(_paired)?(_00*)?(\.bam)?(\.fastq)?(\.gz)?$/
+	prefix = sorted_bam.baseName - ~/(_primertrimmed)?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_sorted)?(_paired)?(_00*)?(\.bam)?(\.fastq)?(\.gz)?$/
 	"""
   samtools mpileup -A -d 20000 -Q 0 -f $refvirus $sorted_bam > $prefix".pileup"
   varscan mpileup2cns $prefix".pileup" --min-var-freq 0.02 --p-value 0.99 --variants --output-vcf 1 > $prefix"_lowfreq.vcf"
