@@ -15,11 +15,11 @@ The workflow processes raw data from FastQ inputs ([FastQC](https://www.bioinfor
 
 The pipeline is built using [Nextflow](https://www.nextflow.io), a bioinformatics workflow tool to run tasks across multiple compute infrastructures in a very portable manner. It comes with docker / singularity containers making installation trivial and results highly reproducible.
 
-<!--
 ### Documentation
 The BU-ISCIII/SARS_Cov2 pipeline comes with documentation about the pipeline, found in the `docs/` directory:
 
 1. [Installation](docs/installation.md)
+<!--
 2. Pipeline configuration
     * [Local installation](docs/configuration/local.md)
     * [Adding your own system](docs/configuration/adding_your_own.md)
