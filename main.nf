@@ -45,7 +45,7 @@ def helpMessage() {
 
     The typical command for running the pipeline is as follows:
 
-    nextflow run SARS_Cov2-nf/main.nf --reads '*_R{1,2}.fastq.gz' --viral_fasta ../../REFERENCES/NC_045512.2.fasta --viral_gff ../../REFERENCES/NC_045512.2.gff --viral_index '../REFERENCES/NC_045512.2.fasta.*' --blast_db '../REFERENCES/NC_045512.2.fasta.*' --host_fasta ../REFERENCES/hg38.fasta --host_index '/processing_Data/bioinformatics/references/eukaria/homo_sapiens/hg38/UCSC/genome/hg38.fullAnalysisSet.fa.*' --plasmidID '/processing_Data/bioinformatics/pipelines/plasmidID/plasmidID.sh' --outdir ./ -profile hpc_isciii
+    nextflow run SARS_Cov2-nf/main.nf --reads '*_R{1,2}.fastq.gz' --viral_fasta ../../REFERENCES/NC_045512.2.fasta --viral_gff ../../REFERENCES/NC_045512.2.gff --viral_index '../REFERENCES/NC_045512.2.fasta.*' --blast_db '../REFERENCES/NC_045512.2.fasta.*' --host_fasta ../REFERENCES/hg38.fasta --host_index '/processing_Data/bioinformatics/references/eukaria/homo_sapiens/hg38/UCSC/genome/hg38.fullAnalysisSet.fa.*' --outdir ./ -profile hpc_isciii
 
     Mandatory arguments:
       --reads                       Path to input data (must be surrounded with quotes).
@@ -55,7 +55,6 @@ def helpMessage() {
       --host_fasta                  Path to host Fasta sequence
       --host_index                  Path to host fasta index
       --blast_db                    Path to reference viral genome BLAST database
-      --plasmidID                   Path to plasmidID bash script
 
     Options:
       --singleEnd                   Specifies that the input is single end reads
@@ -113,12 +112,6 @@ viral_gff = false
 if( params.viral_gff ){
     gff_file = file(params.viral_gff)
     if( !gff_file.exists() ) exit 1, "GFF file not found: ${params.viral_gff}."
-}
-
-params.plasmidID=false
-if( params.plasmidID ){
-    plasmidID_file = file(params.plasmidID)
-    if( !plasmidID_file.exists() ) exit 1, "GFF file not found: ${params.plasmidID}."
 }
 
 blast_header = file("$baseDir/assets/header")
@@ -674,7 +667,7 @@ process blast {
 
 /*
  * STEPS 6.1 plasmidID
-
+ */
 process plasmidID {
   tag "$prefix"
   publishDir path: { "${params.outdir}/12-plasmidID" }, mode: 'copy'
@@ -684,7 +677,6 @@ process plasmidID {
   file meta_scaffolds from metas_pades_scaffold_plasmid
   file unicycler_assembly from unicycler_assembly_plasmid
   file refvirus from viral_fasta_file
-  file plasmidID_file from plasmidID_file
 
   output:
   file "SPADES" into plasmid_SPADES
@@ -694,9 +686,8 @@ process plasmidID {
   script:
   prefix = spades_scaffolds.baseName - ~/(_scaffolds)?(_paired)?(\.fasta)?(\.gz)?$/
   """
-  bash $plasmidID_file -d $refvirus -s $prefix -c spades_scaffolds -g SPADES --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o ./
-  bash $plasmidID_file -d $refvirus -s $prefix -c meta_scaffolds -g METAD_SPADES --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o ./
-  bash $plasmidID_file -d $refvirus -s $prefix -c unicycler_assembly -g UNICYCLER --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o ./
+  bash plasmidID.sh -d $refvirus -s $prefix -c spades_scaffolds -g SPADES --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o ./
+  bash plasmidID.sh -d $refvirus -s $prefix -c meta_scaffolds -g METAD_SPADES --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o ./
+  bash plasmidID.sh -d $refvirus -s $prefix -c unicycler_assembly -g UNICYCLER --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o ./
   """
 }
- */
