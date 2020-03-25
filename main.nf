@@ -394,12 +394,12 @@ if (params.amplicons_file) {
     samtools sort -o $prefix"_primertrimmed_sorted.bam" -O bam -T $prefix $prefix"_primertrimmed.bam"
     samtools index $prefix"_primertrimmed_sorted.bam"
 	  """
-  } else {
-      mapping_virus_sorted_bam_variant_calling
-        .set {sorted_bam_variant_calling}
-      mapping_virus_bai_variant_calling
-        .set {bam_bai_variant_calling}
   }
+} else {
+    mapping_virus_sorted_bam_variant_calling
+      .set {sorted_bam_variant_calling}
+    mapping_virus_bai_variant_calling
+      .set {bam_bai_variant_calling}
 }
 
 
