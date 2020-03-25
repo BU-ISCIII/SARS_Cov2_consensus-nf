@@ -677,7 +677,7 @@ process plasmidID_spades {
   file refvirus from viral_fasta_file
 
   output:
-  file "plasmidid_results" into plasmid_SPADES
+  file "SPADES" into plasmid_SPADES
 
   script:
   prefix = spades_scaffolds.baseName - ~/(_scaffolds)?(_paired)?(\.fasta)?(\.gz)?$/
