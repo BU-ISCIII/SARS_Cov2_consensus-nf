@@ -682,7 +682,7 @@ process plasmidID_spades {
   script:
   prefix = spades_scaffolds.baseName - ~/(_scaffolds)?(_paired)?(\.fasta)?(\.gz)?$/
   """
-  bash plasmidID.sh -d $refvirus -s $prefix -c $spades_scaffolds -g SPADES --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o plasmidid_results
+  bash plasmidID.sh -d $refvirus -s $prefix -c $spades_scaffolds --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o SPADES
   """
 }
 
