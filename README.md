@@ -19,12 +19,5 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a bioinformatic
 The BU-ISCIII/SARS_Cov2 pipeline comes with documentation about the pipeline, found in the `docs/` directory:
 
 1. [Installation](docs/installation.md)
-<!--
-2. Pipeline configuration
-    * [Local installation](docs/configuration/local.md)
-    * [Adding your own system](docs/configuration/adding_your_own.md)
-    * [Reference genomes](docs/configuration/reference_genomes.md)
-3. [Running the pipeline](docs/usage.md)
-4. [Output and how to interpret the results](docs/output.md)
-5. [Troubleshooting](docs/troubleshooting.md)
--->
+2. [Running the pipeline](docs/usage.md)
+3. [Output and how to interpret the results](docs/output.md)
