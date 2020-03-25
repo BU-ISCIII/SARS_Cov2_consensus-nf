@@ -666,28 +666,64 @@ process blast {
 }
 
 /*
- * STEPS 6.1 plasmidID
+ * STEPS 6.1 plasmidID SPADES
  */
-process plasmidID {
+process plasmidID_spades {
   tag "$prefix"
   publishDir path: { "${params.outdir}/12-plasmidID" }, mode: 'copy'
 
   input:
   file spades_scaffolds from spades_scaffold_plasmid
-  file meta_scaffolds from metas_pades_scaffold_plasmid
-  file unicycler_assembly from unicycler_assembly_plasmid
   file refvirus from viral_fasta_file
 
   output:
   file "SPADES" into plasmid_SPADES
-  file "META_SPADES" into plasmid_METASPADES
-  file "UNICYCLER" into plasmid_UNICYCLER
 
   script:
   prefix = spades_scaffolds.baseName - ~/(_scaffolds)?(_paired)?(\.fasta)?(\.gz)?$/
   """
   bash plasmidID.sh -d $refvirus -s $prefix -c $spades_scaffolds -g SPADES --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o .
+  """
+}
+
+/*
+ * STEPS 6.1 plasmidID METASPADES
+ */
+process plasmidID_metaspades {
+  tag "$prefix"
+  publishDir path: { "${params.outdir}/12-plasmidID" }, mode: 'copy'
+
+  input:
+  file meta_scaffolds from metas_pades_scaffold_plasmid
+  file refvirus from viral_fasta_file
+
+  output:
+  file "META_SPADES" into plasmid_METASPADES
+
+  script:
+  prefix = meta_scaffolds.baseName - ~/(_scaffolds)?(_meta)?(\.fasta)?(\.gz)?$/
+  """
   bash plasmidID.sh -d $refvirus -s $prefix -c $meta_scaffolds -g META_SPADES --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o .
+  """
+}
+
+/*
+ * STEPS 6.1 plasmidID UNICYCLER
+ */
+process plasmidID_unicycler {
+  tag "$prefix"
+  publishDir path: { "${params.outdir}/12-plasmidID" }, mode: 'copy'
+
+  input:
+  file unicycler_assembly from unicycler_assembly_plasmid
+  file refvirus from viral_fasta_file
+
+  output:
+  file "UNICYCLER" into plasmid_UNICYCLER
+
+  script:
+  prefix = unicycler_assembly.baseName - ~/(_assembly)?(_paired)?(\.fasta)?(\.gz)?$/
+  """
   bash plasmidID.sh -d $refvirus -s $prefix -c $unicycler_assembly -g UNICYCLER --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o .
   """
 }
