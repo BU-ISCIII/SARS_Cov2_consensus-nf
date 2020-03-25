@@ -670,19 +670,20 @@ process blast {
  */
 process plasmidID_spades {
   tag "$prefix"
-  publishDir path: { "${params.outdir}/12-plasmidID" }, mode: 'copy'
+  publishDir path: { "${params.outdir}/12-plasmidID/SPADES" }, mode: 'copy'
 
   input:
   file spades_scaffolds from spades_scaffold_plasmid
   file refvirus from viral_fasta_file
 
   output:
-  file "SPADES" into plasmid_SPADES
+  file "$prefix" into plasmid_SPADES
 
   script:
   prefix = spades_scaffolds.baseName - ~/(_scaffolds)?(_paired)?(\.fasta)?(\.gz)?$/
   """
-  bash plasmidID.sh -d $refvirus -s $prefix -c $spades_scaffolds --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o SPADES
+  bash plasmidID.sh -d $refvirus -s $prefix -c $spades_scaffolds --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o .
+  mv NO_GROUP/$prefix ./$prefix
   """
 }
 
