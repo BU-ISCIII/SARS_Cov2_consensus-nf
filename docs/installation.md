@@ -35,7 +35,6 @@ You'll need to download the repository from our GitHub:
 ```bash
 wget https://github.com/BU-ISCIII/SARS_Cov2-nf/archive/master.zip
 unzip master.zip -d ~/my-pipelines/
-nextflow run ~/my-pipelines/nf-core/rnaseq-master
 ```
 
 ## Pipeline configuration
