@@ -689,25 +689,26 @@ process plasmidID_spades {
 
 /*
  * STEPS 6.1 plasmidID METASPADES
-
+ */
 process plasmidID_metaspades {
   tag "$prefix"
-  publishDir path: { "${params.outdir}/12-plasmidID" }, mode: 'copy'
+  publishDir path: { "${params.outdir}/12-plasmidID/META_SPADES" }, mode: 'copy'
 
   input:
   file meta_scaffolds from metas_pades_scaffold_plasmid
   file refvirus from viral_fasta_file
 
   output:
-  file "META_SPADES" into plasmid_METASPADES
+  file "$prefix" into plasmid_METASPADES
 
   script:
   prefix = meta_scaffolds.baseName - ~/(_meta_scaffolds)?(\.fasta)?(\.gz)?$/
   """
-  bash plasmidID.sh -d $refvirus -s $prefix -c $meta_scaffolds -g META_SPADES --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o .
+  bash plasmidID.sh -d $refvirus -s $prefix -c $meta_scaffolds --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o .
+  mv NO_GROUP/$prefix ./$prefix
   """
 }
- */
+
 /*
  * STEPS 6.1 plasmidID UNICYCLER
 
