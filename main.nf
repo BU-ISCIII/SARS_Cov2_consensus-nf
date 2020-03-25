@@ -686,8 +686,8 @@ process plasmidID {
   script:
   prefix = spades_scaffolds.baseName - ~/(_scaffolds)?(_paired)?(\.fasta)?(\.gz)?$/
   """
-  bash plasmidID.sh -d $refvirus -s $prefix -c spades_scaffolds -g SPADES --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o ./
-  bash plasmidID.sh -d $refvirus -s $prefix -c meta_scaffolds -g METAD_SPADES --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o ./
-  bash plasmidID.sh -d $refvirus -s $prefix -c unicycler_assembly -g UNICYCLER --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o ./
+  bash plasmidID.sh -d $refvirus -s $prefix -c spades_scaffolds -g SPADES --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o .
+  bash plasmidID.sh -d $refvirus -s $prefix -c meta_scaffolds -g METAD_SPADES --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o .
+  bash plasmidID.sh -d $refvirus -s $prefix -c unicycler_assembly -g UNICYCLER --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o .
   """
 }
