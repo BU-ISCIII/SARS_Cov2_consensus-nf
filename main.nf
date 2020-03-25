@@ -45,7 +45,7 @@ def helpMessage() {
 
     The typical command for running the pipeline is as follows:
 
-    nextflow run SARS_Cov2-nf/main.nf --reads '*_R{1,2}.fastq.gz' --viral_fasta ../../REFERENCES/NC_045512.2.fasta --viral_gff ../../REFERENCES/NC_045512.2.gff --viral_index '../REFERENCES/NC_045512.2.fasta.*' --blast_db '../REFERENCES/NC_045512.2.fasta.*' --host_fasta ../REFERENCES/hg38.fasta --host_index '/processing_Data/bioinformatics/references/eukaria/homo_sapiens/hg38/UCSC/genome/hg38.fullAnalysisSet.fa.*' --amplicons_file ../REFERENCES/nCoV-2019.schemeMod.bed --outdir ./ -profile hpc_isciii
+    nextflow run SARS_Cov2-nf/main.nf --reads '*_R{1,2}.fastq.gz' --viral_fasta ../../REFERENCES/NC_045512.2.fasta --viral_gff ../../REFERENCES/NC_045512.2.gff --viral_index '../REFERENCES/NC_045512.2.fasta.*' --blast_db '../REFERENCES/NC_045512.2.fasta.*' --host_fasta --host_fasta /processing_Data/bioinformatics/references/eukaria/homo_sapiens/hg38/UCSC/genome/hg38.fullAnalysisSet.fa --host_index '/processing_Data/bioinformatics/references/eukaria/homo_sapiens/hg38/UCSC/genome/hg38.fullAnalysisSet.fa.*' --amplicons_file ../REFERENCES/nCoV-2019.schemeMod.bed --outdir ./ -profile hpc_isciii
 
     Mandatory arguments:
       --reads                       Path to input data (must be surrounded with quotes).
