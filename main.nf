@@ -152,13 +152,6 @@ if( params.viral_index ){
         .into { viral_index_files; viral_index_files_variant_calling }
 }
 
-/*
- * Channel.fromPath("$baseDir/assets/header")
-        .into{ blast_header }
-
- */
-
-
 
 // Header log info
 log.info "========================================="
