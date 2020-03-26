@@ -2,12 +2,13 @@
 
 /*
 ========================================================================================
-                  SARS-Cov2 Illumina SISPA Analysis
+                  SARS-Cov2 Illumina Consensus Analysis
 ========================================================================================
  #### Homepage / Documentation
- https://github.com/BU-ISCIII/SARS_Cov2-nf
+ https://github.com/BU-ISCIII/SARS_Cov2_consensus-nf
  @#### Authors
  Sarai Varona <s.varona@isciii.es>
+ Sara Monzón  <smonzon@isciii.es>
 ----------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------
 Pipeline overview:
@@ -15,7 +16,7 @@ Pipeline overview:
  	- 1.1: FastQC - for raw sequencing reads quality control
  	- 1.2: Trimmomatic - raw sequence trimming
  - 2. : Mapping
- 	- 2.1 : BWA - Mapping to host and reference viral genome
+ 	- 2.1 : Bowtie2 - Mapping to host and reference viral genome
  	- 2.2 : Samtools - SAM and BAM files processing and stats
   - 2.3 : Picard - Mapping stats
   - 2.4 : iVar - Remove primers by coordinates.
@@ -24,37 +25,28 @@ Pipeline overview:
   - 3.2 : SnpEff - Variant Annotation
   - 3.3 : Bgzip - Variant calling vcf file compression
   - 3.4 : Bcftools - Consensus genome
- - 4. : DeNovo assembly:
-  - 4.1 : Spades - De Novo assembly (normal mode and metaSpades mode)
-  - 4.2 : Unicycler - De novo assembly
-  - 4.3 : Quast - Assembly quality assessment.
-  - 4.4 : ABACAS - Assembly contig reordering and draft generation
- - 5. : Assembly Alignment
-  - 5.1 : BLAST - Assembly alignment to viral reference
- - 6. Stats & Graphs :
-  - 6.1 : PlasmidID - Assembly plot generation
+ - 4. : Stats
+  - 4.1 : MultiQC - Final html report with stats
  ----------------------------------------------------------------------------------------
 */
 
 def helpMessage() {
     log.info"""
     =========================================
-     BU-ISCIII/SARS_Cov2-nf : SARS_Cov2 Illumina SISPA data analysis v${version}
+     BU-ISCIII/SARS_Cov2_consensus-nf : SARS_Cov2 Illumina consensus genome analysis v${version}
     =========================================
     Usage:
 
     The typical command for running the pipeline is as follows:
 
-    nextflow run SARS_Cov2-nf/main.nf --reads '*_R{1,2}.fastq.gz' --viral_fasta ../../REFERENCES/NC_045512.2.fasta --viral_gff ../../REFERENCES/NC_045512.2.gff --viral_index '../REFERENCES/NC_045512.2.fasta.*' --blast_db '../REFERENCES/NC_045512.2.fasta.*' --host_fasta --host_fasta /processing_Data/bioinformatics/references/eukaria/homo_sapiens/hg38/UCSC/genome/hg38.fullAnalysisSet.fa --host_index '/processing_Data/bioinformatics/references/eukaria/homo_sapiens/hg38/UCSC/genome/hg38.fullAnalysisSet.fa.*' --amplicons_file ../REFERENCES/nCoV-2019.schemeMod.bed --outdir ./ -profile hpc_isciii
+    nextflow run SARS_Cov2-nf/main.nf --reads '*_R{1,2}.fastq.gz' --viral_fasta ../../REFERENCES/NC_045512.2.fasta --viral_index '../REFERENCES/NC_045512.2.fasta.*' --host_fasta /processing_Data/bioinformatics/references/eukaria/homo_sapiens/hg38/UCSC/genome/hg38.fullAnalysisSet.fa --host_index '/processing_Data/bioinformatics/references/eukaria/homo_sapiens/hg38/UCSC/genome/hg38.fullAnalysisSet.fa.*' --amplicons_file ../REFERENCES/nCoV-2019.schemeMod.bed --outdir ./ -profile hpc_isciii
 
     Mandatory arguments:
       --reads                       Path to input data (must be surrounded with quotes).
       --viral_fasta                 Path to Fasta reference
-      --viral_gff					          Path to GFF reference file. (Mandatory if step = assembly)
       --viral_index                 Path to viral fasta index
       --host_fasta                  Path to host Fasta sequence
       --host_index                  Path to host fasta index
-      --blast_db                    Path to reference viral genome BLAST database
 
     Options:
       --singleEnd                   Specifies that the input is single end reads
@@ -113,16 +105,6 @@ if( params.host_fasta ){
 }
 
 
-// GFF file
-viral_gff = false
-
-if( params.viral_gff ){
-    gff_file = file(params.viral_gff)
-    if( !gff_file.exists() ) exit 1, "GFF file not found: ${params.viral_gff}."
-}
-
-blast_header = file("$baseDir/assets/header")
-
 // Output md template location
 output_docs = file("$baseDir/docs/output.md")
 
@@ -144,10 +126,6 @@ params.singleEnd = false
 // Validate  mandatory inputs
 params.reads = false
 if (! params.reads ) exit 1, "Missing reads: $params.reads. Specify path with --reads"
-
-if ( ! params.viral_gff ){
-    exit 1, "GFF file not provided for assembly step, please declare it with --viral_gff /path/to/gff_file"
-}
 
 /*
  * Create channel for input files
@@ -198,7 +176,6 @@ def summary = [:]
 summary['Reads']               = params.reads
 summary['Data Type']           = params.singleEnd ? 'Single-End' : 'Paired-End'
 summary['Fasta Ref']           = params.viral_fasta
-summary['GFF File']            = params.viral_gff
 summary['Container']           = workflow.container
 if(workflow.revision) summary['Pipeline Release'] = workflow.revision
 summary['Current home']        = "$HOME"
@@ -305,8 +282,6 @@ process mapping_host {
       else if (filename.indexOf(".txt") > 0) "stats/$filename"
       else if (filename.indexOf(".stats") > 0) "stats/$filename"
 	}
-  cpus '10'
-  penv 'openmp'
 
 	input:
 	set file(readsR1),file(readsR2) from trimmed_paired_reads_bwa
@@ -322,9 +297,8 @@ process mapping_host {
 	script:
 	prefix = readsR1.toString() - '_paired_R1.fastq.gz'
 	"""
-	bwa mem -t 10 $refhost $readsR1 $readsR2 > $prefix".sam"
-  samtools view -b $prefix".sam" > $prefix".bam"
-  samtools sort -o $prefix"_sorted.bam" -O bam -T $prefix $prefix".bam"
+  bowtie2 --local -x $refhost -1 $readsR1 -2 $readsR2 --very-sensitive-local -S $prefix".sam"
+  samtools sort -o $prefix"_sorted.bam" -O bam -T $prefix $prefix".sam"
   samtools index $prefix"_sorted.bam"
   samtools flagstat $prefix"_sorted.bam" > $prefix"_flagstat.txt"
   picard CollectWgsMetrics COVERAGE_CAP=1000000 I=$prefix"_sorted.bam" O=$prefix".stats" R=$refhost
@@ -343,8 +317,6 @@ process mapping_virus {
       else if (filename.indexOf(".txt") > 0) "stats/$filename"
       else if (filename.indexOf(".stats") > 0) "stats/$filename"
 	}
-  cpus '10'
-  penv 'openmp'
 
 	input:
 	set file(readsR1),file(readsR2) from trimmed_paired_reads_bwa_virus
@@ -360,9 +332,8 @@ process mapping_virus {
 	script:
   prefix = readsR1.toString() - '_paired_R1.fastq.gz'
 	"""
-	bwa mem -t 10 $refvirus $readsR1 $readsR2 > $prefix".sam"
-  samtools view -b $prefix".sam" > $prefix".bam"
-  samtools sort -o $prefix"_sorted.bam" -O bam -T $prefix $prefix".bam"
+  bowtie2 --local -x $refvirus -1 $readsR1 -2 $readsR2 --very-sensitive-local -S $prefix".sam"
+  samtools sort -o $prefix"_sorted.bam" -O bam -T $prefix $prefix".sam"
   samtools index $prefix"_sorted.bam"
   samtools flagstat $prefix"_sorted.bam" > $prefix"_flagstat.txt"
   picard CollectWgsMetrics COVERAGE_CAP=1000000 I=$prefix"_sorted.bam" O=$prefix".stats" R=$refvirus
@@ -481,292 +452,5 @@ process genome_consensus {
   bgzip -c $variants > $prefix"_"$refname".vcf.gz"
   bcftools index $prefix"_"$refname".vcf.gz"
   cat $refvirus | bcftools consensus $prefix"_"$refname".vcf.gz" > $prefix"_"$refname"_consensus.fasta"
-  """
-}
-
-
-/*
- * STEPS 4.1 Select unmapped host reads
- */
-process unmapped_host {
-  tag "$prefix"
-  publishDir "${params.outdir}/09-assembly", mode: 'copy',
-    saveAs: {filename ->
-      if (params.save_unmapped_host) "unmapped/$filename"
-      else null
-  }
-
-  input:
-  file sorted_bam from mapping_host_sorted_bam_assembly
-  file bam_bai from mapping_host_bai_assembly
-
-  output:
-  file '*_unmapped.bam' into unmapped_host_bam
-  file '*_unmapped_qsorted.bam' into unmapped_host_qsorted_bam
-  file '*_unmapped.fastq' into unmapped_host_reads,unmapped_host_reads_spades,unmapped_host_reads_metaspades,unmapped_host_reads_unicycler
-
-  script:
-  prefix = sorted_bam.baseName - ~/(_sorted)?(_paired)?(\.bam)?(\.gz)?$/
-  """
-  samtools view -b -f 4 $sorted_bam > $prefix"_unmapped.bam"
-  samtools sort -n $prefix"_unmapped.bam" -o $prefix"_unmapped_qsorted.bam"
-  bedtools bamtofastq -i $prefix"_unmapped_qsorted.bam" -fq $prefix"_R1_unmapped.fastq" -fq2 $prefix"_R2_unmapped.fastq"
-  """
-}
-
-/*
- * STEPS 4.2 De Novo Spades Assembly
- */
-process spades_assembly {
-  tag "$prefix"
-  publishDir path: { "${params.outdir}/09-assembly/spades" }, mode: 'copy'
-
-  cpus '10'
-  penv 'openmp'
-
-  input:
-  set file(readsR1),file(readsR2) from unmapped_host_reads_spades
-
-  output:
-  file '*_scaffolds.fasta' into spades_scaffold,spades_scaffold_quast,spades_scaffold_abacas,spades_scaffold_blast,spades_scaffold_plasmid
-
-  script:
-  prefix = readsR1.toString() - '_R1_unmapped.fastq'
-  """
-  spades.py -t 10 -1 $readsR1 -2 $readsR2 -o ./
-  mv scaffolds.fasta $prefix"_scaffolds.fasta"
-  """
-}
-
-/*
- * STEPS 4.2 De Novo MetaSpades Assembly
- */
-process metaspades_assembly {
-  tag "$prefix"
-  publishDir path: { "${params.outdir}/09-assembly/metaspades" }, mode: 'copy'
-
-  cpus '10'
-  penv 'openmp'
-
-  input:
-  set file(readsR1),file(readsR2) from unmapped_host_reads_metaspades
-
-  output:
-  file '*_meta_scaffolds.fasta' into metaspades_scaffold,metas_pades_scaffold_quast,metas_pades_scaffold_plasmid
-
-  script:
-  prefix = readsR1.toString() - '_R1_unmapped.fastq'
-  """
-  spades.py -t 10 -1 $readsR1 -2 $readsR2 --meta -o ./
-  mv scaffolds.fasta $prefix"_meta_scaffolds.fasta"
-  """
-}
-
-
-/*
- * STEPS 4.3 De Novo Unicycler Assembly
- */
-process unicycler_assembly {
-  tag "$prefix"
-  publishDir path: { "${params.outdir}/09-assembly/unicycler" }, mode: 'copy'
-
-  cpus '10'
-  penv 'openmp'
-
-  input:
-  set file(readsR1),file(readsR2) from unmapped_host_reads_unicycler
-
-  output:
-  file '*_assembly.fasta' into unicycler_assembly,unicycler_assembly_quast,unicycler_assembly_plasmid
-
-  script:
-  prefix = readsR1.toString() - '_R1_unmapped.fastq'
-  """
-  unicycler -t 10 -o ./ -1 $readsR1 -2 $readsR2
-  mv assembly.fasta $prefix"_assembly.fasta"
-  """
-}
-
-/*
- * STEPS 4.4 Spades Assembly Quast
- */
-process spades_quast {
-  tag "$prefix"
-  publishDir path: { "${params.outdir}/09-assembly/" }, mode: 'copy'
-
-  cpus '10'
-  penv 'openmp'
-
-  input:
-  file scaffolds from spades_scaffold_quast.collect()
-  file meta_scaffolds from metas_pades_scaffold_quast.collect()
-  file refvirus from viral_fasta_file
-  file viral_gff from gff_file
-
-  output:
-  file "spades_quast" into spades_quast_resuts
-	file "spades_quast/report.tsv" into spades_quast_resuts_multiqc
-
-  script:
-  prefix = 'spades_quast'
-  """
-  quast.py --output-dir $prefix -R $refvirus -G $viral_gff -t 10 \$(find . -name "*_scaffolds.fasta" | tr '\n' ' ')
-  """
-}
-
-/*
- * STEPS 4.5 Unicycler Assembly Quast
- */
-process unicycler_quast {
-  tag "$prefix"
-  publishDir path: { "${params.outdir}/09-assembly/" }, mode: 'copy'
-
-  cpus '10'
-  penv 'openmp'
-
-  input:
-  file assemblies from unicycler_assembly_quast.collect()
-  file refvirus from viral_fasta_file
-  file viral_gff from gff_file
-
-  output:
-  file "unicycler_quast" into unicycler_quast_resuts
-	file "unicycler_quast/report.tsv" into unicycler_quast_resuts_multiqc
-
-  script:
-  prefix = 'unicycler_quast'
-  """
-  quast.py --output-dir $prefix -R $refvirus -G $viral_gff -t 10 \$(find . -name "*_assembly.fasta" | tr '\n' ' ')
-  """
-}
-
-/*
- * STEPS 4.6 ABACAS
- */
-process abacas {
-  tag "$prefix"
-  publishDir "${params.outdir}/10-abacas", mode: 'copy',
-		saveAs: {filename ->
-			if (filename.indexOf("_abacas.bin") > 0) "abacas/$filename"
-			else if (filename.indexOf("_abacas.crunch") > 0) "abacas/$filename"
-      else if (filename.indexOf("_abacas.fasta") > 0) "abacas/$filename"
-      else if (filename.indexOf("_abacas.gaps") > 0) "abacas/$filename"
-      else if (filename.indexOf(".tab") > 0) "abacas/$filename"
-      else if (filename.indexOf("_abacas.MULTIFASTA.fa") > 0) "abacas/$filename"
-      else if (filename.indexOf("_abacas.gaps.tab") > 0) "abacas/$filename"
-      else if (filename.indexOf(".delta") > 0) "nucmer/$filename"
-      else if (filename.indexOf(".tiling") > 0) "nucmer/$filename"
-      else if (filename.indexOf(".out") > 0) "nucmer/$filename"
-			else filename
-	}
-  input:
-  file scaffolds from spades_scaffold_abacas
-  file refvirus from viral_fasta_file
-
-  output:
-  file "*_abacas.fasta" into abacas_fasta
-	file "*_abacas*" into abacas_results
-
-  script:
-  prefix = scaffolds.baseName - ~/(_scaffolds)?(_paired)?(\.fasta)?(\.gz)?$/
-  """
-  abacas.pl -r $refvirus -q $scaffolds -m -p nucmer -o $prefix"_abacas"
-  mv nucmer.delta $prefix"_abacas_nucmer.delta"
-  mv nucmer.filtered.delta $prefix"_abacas_nucmer.filtered.delta"
-  mv nucmer.tiling $prefix"_abacas_nucmer.tiling"
-  mv unused_contigs.out $prefix"_abacas_unused_contigs.out"
-  """
-}
-
-/*
- * STEPS 5.1 BLAST
- */
-process blast {
-  tag "$prefix"
-  publishDir path: { "${params.outdir}/11-blast" }, mode: 'copy'
-
-  cpus '10'
-  penv 'openmp'
-
-  input:
-  file scaffolds from spades_scaffold_blast
-  file blast_db from blast_db_files.collect()
-  file header from blast_header
-
-  output:
-  file "*_blast_filt_header.txt" into blast_results
-
-  script:
-  prefix = scaffolds.baseName - ~/(_scaffolds)?(_paired)?(\.fasta)?(\.gz)?$/
-  database = blast_db[1].toString() - ~/(\.ann)?$/
-  """
-  blastn -num_threads 10 -db $database -query $scaffolds -outfmt \'6 stitle std slen qlen qcovs\' -out $prefix"_blast.txt"
-  awk 'BEGIN{OFS=\"\\t\";FS=\"\\t\"}{print \$0,\$5/\$15,\$5/\$14}' $prefix"_blast.txt" | awk 'BEGIN{OFS=\"\\t\";FS=\"\\t\"} \$15 > 200 && \$17 > 0.7 && \$1 !~ /phage/ {print \$0}' > $prefix"_blast_filt.txt"; cat $header $prefix"_blast_filt.txt" > $prefix"_blast_filt_header.txt"
-  """
-}
-
-/*
- * STEPS 6.1 plasmidID SPADES
- */
-process plasmidID_spades {
-  tag "$prefix"
-  publishDir path: { "${params.outdir}/12-plasmidID/SPADES" }, mode: 'copy'
-
-  input:
-  file spades_scaffolds from spades_scaffold_plasmid
-  file refvirus from viral_fasta_file
-
-  output:
-  file "$prefix" into plasmid_SPADES
-
-  script:
-  prefix = spades_scaffolds.baseName - ~/(_scaffolds)?(_paired)?(\.fasta)?(\.gz)?$/
-  """
-  bash plasmidID.sh -d $refvirus -s $prefix -c $spades_scaffolds --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o .
-  mv NO_GROUP/$prefix ./$prefix
-  """
-}
-
-/*
- * STEPS 6.1 plasmidID METASPADES
- */
-process plasmidID_metaspades {
-  tag "$prefix"
-  publishDir path: { "${params.outdir}/12-plasmidID/META_SPADES" }, mode: 'copy'
-
-  input:
-  file meta_scaffolds from metas_pades_scaffold_plasmid
-  file refvirus from viral_fasta_file
-
-  output:
-  file "$prefix" into plasmid_METASPADES
-
-  script:
-  prefix = meta_scaffolds.baseName - ~/(_meta_scaffolds)?(\.fasta)?(\.gz)?$/
-  """
-  bash plasmidID.sh -d $refvirus -s $prefix -c $meta_scaffolds --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o .
-  mv NO_GROUP/$prefix ./$prefix
-  """
-}
-
-/*
- * STEPS 6.1 plasmidID UNICYCLER
- */
-process plasmidID_unicycler {
-  tag "$prefix"
-  publishDir path: { "${params.outdir}/12-plasmidID/UNICYCLER" }, mode: 'copy'
-
-  input:
-  file unicycler_assembly from unicycler_assembly_plasmid
-  file refvirus from viral_fasta_file
-
-  output:
-  file "$prefix" into plasmid_UNICYCLER
-
-  script:
-  prefix = unicycler_assembly.baseName - ~/(_assembly)?(_paired)?(\.fasta)?(\.gz)?$/
-  """
-  bash plasmidID.sh -d $refvirus -s $prefix -c $unicycler_assembly --only-reconstruct -C 47 -S 47 -i 60 --no-trim -o .
-  mv NO_GROUP/$prefix ./$prefix
   """
 }
