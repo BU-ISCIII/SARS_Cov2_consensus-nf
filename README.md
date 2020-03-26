@@ -1,6 +1,6 @@
 <img src="docs/images/BU_ISCIII_logo.png" alt="logo" width="300" align="right"/>
 
-# SARS_Cov2-nf
+# SARS_Cov2_consensus-nf
 [![Nextflow](https://img.shields.io/badge/nextflow-%E2%89%A50.32.0-brightgreen.svg)](https://www.nextflow.io/)
 [![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg)](http://bioconda.github.io/)
 
@@ -9,9 +9,9 @@
 -->
 ### Introduction
 
-**BU-ISCIII/SARS_Cov2-nf** is a bioinformatics analysis pipeline used to analyze SARS-Cov2 Illumina SISPA data.
+**BU-ISCIII/SARS_Cov2_consensus-nf** is a bioinformatics analysis pipeline used to analyze SARS-Cov2 Illumina data. The approach followed by this pipeline is to create a consensus genome through mapping, variant calling and consensus genome generation.
 
-The workflow processes raw data from FastQ inputs ([FastQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/), [Trimmomatic](http://www.usadellab.org/cms/?page=trimmomatic)), maps the reads ([BWA](http://bio-bwa.sourceforge.net/bwa.shtml) and [Samtools](http://www.htslib.org/doc/samtools.html)) against the host and the viral reference genome, calls for variants and annotates them ([VarScan](http://varscan.sourceforge.net/), [SnpEff](http://snpeff.sourceforge.net/)), generates a genome sequence consensus ([Bgzip](http://www.htslib.org/doc/bgzip.html) and [BCFtools](http://www.htslib.org/doc/bcftools.html)) with the variants, generated a _De Novo_ genome assembly ([Spades](https://kbase.us/applist/apps/kb_SPAdes/run_SPAdes/release?gclid=Cj0KCQjwjcfzBRCHARIsAO-1_OqnS_JLZtmi_CUOht4Vrl12Rc9bjuTFZKopaxNVWAE6RNgkLjuCfLAaAhjeEALw_wcB) and/or [Unicycler](https://github.com/rrwick/Unicycler)), reorders the contigs generating a draft genome ([Abacas](http://abacas.sourceforge.net/index.html)), aligns the assemblies ([BLAST](https://www.ncbi.nlm.nih.gov/books/NBK279690/)) and creates a series of stats and graphs ([plasmidID](https://github.com/BU-ISCIII/plasmidID)). See the [output documentation](docs/output.md) for more details of the results.
+The workflow processes raw data from FastQ inputs ([FastQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/), [Trimmomatic](http://www.usadellab.org/cms/?page=trimmomatic)), maps the reads ([Bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/index.shtml) and [Samtools](http://www.htslib.org/doc/samtools.html)) against the host and the viral reference genome. Optionally, if the data has been obtaine through amplicon sequencing you can use [iVar](http://gensoft.pasteur.fr/docs/ivar/1.0/manualpage.html) to trim the primers. Then the pipeline calls for variants and annotates them ([VarScan](http://varscan.sourceforge.net/), [SnpEff](http://snpeff.sourceforge.net/)), generates a genome sequence consensus ([Bgzip](http://www.htslib.org/doc/bgzip.html) and [BCFtools](http://www.htslib.org/doc/bcftools.html)) with the variants. Finally aligns the assemblies ([BLAST](https://www.ncbi.nlm.nih.gov/books/NBK279690/)) and creates a series of stats and graphs ([plasmidID](https://github.com/BU-ISCIII/plasmidID)). See the [output documentation](docs/output.md) for more details of the results.
 
 The pipeline is built using [Nextflow](https://www.nextflow.io), a bioinformatics workflow tool to run tasks across multiple compute infrastructures in a very portable manner. It comes with docker / singularity containers making installation trivial and results highly reproducible.
 
