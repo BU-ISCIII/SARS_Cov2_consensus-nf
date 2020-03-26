@@ -1,6 +1,6 @@
 # You can use this file to create a conda environment for this pipeline:
 #   conda env create -f environment.yml
-name: virus_illumina
+name: virus_illumina_consensus
 channels:
   - defaults
   - conda-forge
@@ -10,30 +10,17 @@ dependencies:
   ## Common
   - fastqc=0.11.8
   - trimmomatic=0.38
-  - muscle
   - samtools=1.9
-  - bwa=0.7.12
   - multiqc=1.5
   - pip=19.3.1
   ## mapping
   - ivar=1.1
   - picard=2.18.27
   - bcftools=1.9
+  - bowtie2=2.3.5
   - varscan=2.4.4-0
   - snpeff
   - bedtools=2.26.0
-  ## assembly
-  - spades=3.14.0-0
-  - unicycler=0.4.6
-  - quast=5.0.1
-  - blast=2.9.0-0
-  - abacas=1.3.1
-  - bowtie2=2.3.5
-  - cd-hit=4.8.1
-  - circos=0.69.8
-  - gawk=5.0.1
-  - mash=2.2.1
-  - prokka=1.12
   - pip:
     - joblib==0.14.1
     - numpy==1.18.1
