@@ -152,14 +152,6 @@ if( params.viral_index ){
         .into { viral_index_files; viral_index_files_variant_calling }
 }
 
-if( params.blast_db ){
-    Channel
-        .fromPath(params.blast_db)
-        .ifEmpty { exit 1, "Viral fasta index not found: ${params.blast_db}" }
-        .into { blast_db_files; blast_db_files }
-}
-
-
 /*
  * Channel.fromPath("$baseDir/assets/header")
         .into{ blast_header }
