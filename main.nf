@@ -439,7 +439,7 @@ process genome_consensus {
   publishDir "${params.outdir}/08-mapping_consensus", mode: 'copy',
 		saveAs: {filename ->
 			if (filename.indexOf("_consensus.fasta") > 0) "consensus/$filename"
-			else if (filename.indexOf("_consensus.fasta") > 0) "majority/$filename"
+			else if (filename.indexOf("_consensus_masked.fasta") > 0) "masked/$filename"
 	}
 
   input:
@@ -450,6 +450,7 @@ process genome_consensus {
 
   output:
   file '*_consensus.fasta' into consensus_fasta
+  file '*_consensus_masked.fasta' into masked_fasta
 
   script:
   prefix = variants.baseName - ~/(_majority)?(_paired)?(\.vcf)?(\.gz)?$/
