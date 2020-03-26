@@ -274,8 +274,8 @@ process mapping_host {
   file index from host_index_files.collect()
 
 	output:
-	file '*_sorted.bam' into mapping_host_sorted_bam,mapping_host_sorted_bam_assembly
-  file '*.bam.bai' into mapping_host_bai,mapping_host_bai_assembly
+	file '*_sorted.bam' into mapping_host_sorted_bam
+  file '*.bam.bai' into mapping_host_bai
 	file '*_flagstat.txt' into mapping_host_flagstat
 	file '*.stats' into mapping_host_picardstats
 
@@ -338,8 +338,8 @@ if (params.amplicons_file) {
     file amplicons_bed from amplicons_bed_file
 
 	  output:
-	  file '*_primertrimmed_sorted.bam' into ivar_sorted_bam,sorted_bam_variant_calling
-    file '*_primertrimmed_sorted.bam.bai' into ivar_bai,bam_bai_variant_calling
+	  file '*_primertrimmed_sorted.bam' into ivar_sorted_bam,sorted_bam_variant_calling,ivar_sorted_bam_consensus
+    file '*_primertrimmed_sorted.bam.bai' into ivar_bai,bam_bai_variant_calling,ivar_bai_consensus
 
 	  script:
     prefix = sorted_bam.baseName - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_sorted)?(_paired)?(_00*)?(\.bam)?(\.fastq)?(\.gz)?$/
@@ -380,8 +380,8 @@ process variant_calling {
 
 	output:
 	file '*.pileup' into variant_calling_pileup
-  file '*_majority.vcf' into majority_allele_vcf
-	file '*_lowfreq.vcf' into lowfreq_variants_vcf,lowfreq_variants_vcf_annotation,lowfreq_variants_vcf_consensus
+  file '*_majority.vcf' into majority_allele_vcf,majority_allele_vcf_annotation,majority_allele_vcf_consensus
+	file '*_lowfreq.vcf' into lowfreq_variants_vcf,lowfreq_variants_vcf_annotation
 
 	script:
 	prefix = sorted_bam.baseName - ~/(_primertrimmed)?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_sorted)?(_paired)?(_00*)?(\.bam)?(\.fastq)?(\.gz)?$/
@@ -397,22 +397,37 @@ process variant_calling {
  */
 process variant_calling_annotation {
  	tag "$prefix"
- 	publishDir path: { "${params.outdir}/07-annotation" }, mode: 'copy'
+  publishDir "${params.outdir}/07-annotation", mode: 'copy',
+		saveAs: {filename ->
+			if (filename.indexOf("majority.ann.vcf") > 0) "majority/$filename"
+			else if (filename.indexOf("majority_snpEff_genes.txt") > 0) "majority/$filename"
+      else if (filename.indexOf("majority_snpEff_summary.html") > 0) "majority/$filename"
+      else if (filename.indexOf("lowfreq.ann.vcf") > 0) "lowfreq/$filename"
+      else if (filename.indexOf("lowfreq_snpEff_genes.txt") > 0) "lowfreq/$filename"
+      else if (filename.indexOf("lowfreq_snpEff_summary.html") > 0) "lowfreq/$filename"
+	}
 
  	input:
- 	file variants from lowfreq_variants_vcf_annotation
+ 	file majority_variants from majority_allele_vcf_annotation
+  file low_variants from lowfreq_variants_vcf_annotation
 
  	output:
- 	file '*.ann.vcf' into annotated_variants
-  file '*_snpEff_genes.txt' into snpeff_genes
- 	file '*_snpEff_summary.html' into snpeff_summary
+ 	file '*_majority.ann.vcf' into majority_annotated_variants
+  file '*_majority_snpEff_genes.txt' into majority_snpeff_genes
+ 	file '*_majority_snpEff_summary.html' into majority_snpeff_summary
+  file '*_lowfreq.ann.vcf' into lowfreq_annotated_variants
+  file '*_lowfreq_snpEff_genes.txt' into lowfreq_snpeff_genes
+ 	file '*_lowfreq_snpEff_summary.html' into lowfreq_snpeff_summary
 
  	script:
- 	prefix = variants.baseName - ~/(_S[0-9]{2})?(_lowfreq)?(.R1)?(_1)?(_R1)?(_sorted)?(_paired)?(_00*)?(\.bam)?(\.vcf)?(\.gz)?$/
+ 	prefix = majority_variants.baseName - ~/(_S[0-9]{2})?(_majority)?(.R1)?(_1)?(_R1)?(_sorted)?(_paired)?(_00*)?(\.bam)?(\.vcf)?(\.gz)?$/
  	"""
-  snpEff sars-cov-2 $variants > $prefix".ann.vcf"
-  mv snpEff_genes.txt $prefix"_snpEff_genes.txt"
-  mv snpEff_summary.html $prefix"_snpEff_summary.html"
+  snpEff sars-cov-2 $majority_variants > $prefix"_majority.ann.vcf"
+  mv snpEff_genes.txt $prefix"_majority_snpEff_genes.txt"
+  mv snpEff_summary.html $prefix"_majority_snpEff_summary.html"
+  snpEff sars-cov-2 $low_variants > $prefix"_lowfreq.ann.vcf"
+  mv snpEff_genes.txt $prefix"_lowfreq_snpEff_genes.txt"
+  mv snpEff_summary.html $prefix"_lowfreq_snpEff_summary.html"
  	"""
 }
 
@@ -421,21 +436,30 @@ process variant_calling_annotation {
  */
 process genome_consensus {
   tag "$prefix"
-  publishDir path: { "${params.outdir}/08-mapping_consensus" }, mode: 'copy'
+  publishDir "${params.outdir}/08-mapping_consensus", mode: 'copy',
+		saveAs: {filename ->
+			if (filename.indexOf("_consensus.fasta") > 0) "consensus/$filename"
+			else if (filename.indexOf("_consensus.fasta") > 0) "majority/$filename"
+	}
 
   input:
-  file variants from lowfreq_variants_vcf_consensus
+  file variants from majority_allele_vcf_consensus
   file refvirus from viral_fasta_file
+  file ivar_bam from ivar_sorted_bam_consensus
+  file ivar_bai from ivar_bai_consensus
 
   output:
   file '*_consensus.fasta' into consensus_fasta
 
   script:
-  prefix = variants.baseName - ~/(_lowfreq)?(_paired)?(\.vcf)?(\.gz)?$/
+  prefix = variants.baseName - ~/(_majority)?(_paired)?(\.vcf)?(\.gz)?$/
   refname = refvirus.baseName - ~/(\.2)?(\.fasta)?$/
   """
   bgzip -c $variants > $prefix"_"$refname".vcf.gz"
   bcftools index $prefix"_"$refname".vcf.gz"
   cat $refvirus | bcftools consensus $prefix"_"$refname".vcf.gz" > $prefix"_"$refname"_consensus.fasta"
+  bedtools genomecov -bga -ibam $ivar_bam -g $refvirus | awk '\$4 < 20' | bedtools merge > $prefix"_"$refname"_bed4mask.bed"
+  bedtools maskfasta -fi $prefix"_"$refname"_consensus.fasta" -bed $prefix"_"$refname"_bed4mask.bed" -fo $prefix"_"$refname"_consensus_masked.fasta"
+  sed -i 's/NC_045512.2/$prefix/g' $prefix"_"$refname"_consensus_masked.fasta"
   """
 }
