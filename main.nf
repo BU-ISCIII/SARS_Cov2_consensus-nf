@@ -517,7 +517,7 @@ process multiqc {
 
 /*
  * STEP 5 - Output Description HTML
-
+ */
 process output_documentation {
     publishDir "${params.outdir}/../DOC/", mode: 'copy'
 
@@ -541,4 +541,3 @@ process output_documentation {
       """
     }
 }
- */
