@@ -266,8 +266,9 @@ process trimming {
 	trimmomatic PE -threads ${task.cpus} -phred33 $reads $prefix"_paired_R1.fastq" $prefix"_unpaired_R1.fastq" $prefix"_paired_R2.fastq" $prefix"_unpaired_R2.fastq" ILLUMINACLIP:${params.trimmomatic_adapters_file}:${params.trimmomatic_adapters_parameters} SLIDINGWINDOW:${params.trimmomatic_window_length}:${params.trimmomatic_window_value} MINLEN:${params.trimmomatic_mininum_length} 2> ${name}.log
 
 	gzip *.fastq
-
-	fastqc -q *_paired_*.fastq.gz
+	mkdir tmp
+	fastqc -t ${task.cpus} -q *_paired_*.fastq.gz
+	rm -rf tmp
 
 	"""
 }
@@ -298,7 +299,7 @@ process mapping_host {
 	script:
 	prefix = readsR1.toString() - '_paired_R1.fastq.gz'
 	"""
-  bowtie2 --local -x $refhost -1 $readsR1 -2 $readsR2 --very-sensitive-local -S $prefix".sam"
+  bowtie2 -p ${task.cpus} --local -x $refhost -1 $readsR1 -2 $readsR2 --very-sensitive-local -S $prefix".sam"
   samtools sort -o $prefix"_sorted.bam" -O bam -T $prefix $prefix".sam"
   samtools index $prefix"_sorted.bam"
   samtools flagstat $prefix"_sorted.bam" > $prefix"_flagstat.txt"
@@ -333,7 +334,7 @@ process mapping_virus {
 	script:
   prefix = readsR1.toString() - '_paired_R1.fastq.gz'
 	"""
-  bowtie2 --local -x $refvirus -1 $readsR1 -2 $readsR2 --very-sensitive-local -S $prefix".sam"
+  bowtie2 -p ${task.cpus} --local -x $refvirus -1 $readsR1 -2 $readsR2 --very-sensitive-local -S $prefix".sam"
   samtools sort -o $prefix"_sorted.bam" -O bam -T $prefix $prefix".sam"
   samtools index $prefix"_sorted.bam"
   samtools flagstat $prefix"_sorted.bam" > $prefix"_flagstat.txt"
@@ -493,7 +494,7 @@ process genome_consensus {
   cat $refvirus | bcftools consensus $prefix"_"$refname".vcf.gz" > $prefix"_"$refname"_consensus.fasta"
   bedtools genomecov -bga -ibam $sorted_bam -g $refvirus | awk '\$4 < 20' | bedtools merge > $prefix"_"$refname"_bed4mask.bed"
   bedtools maskfasta -fi $prefix"_"$refname"_consensus.fasta" -bed $prefix"_"$refname"_bed4mask.bed" -fo $prefix"_"$refname"_consensus_masked.fasta"
-  sed -i 's/NC_045512.2/$prefix/g' $prefix"_"$refname"_consensus_masked.fasta"
+  sed -i 's/$refname/$prefix/g' $prefix"_"$refname"_consensus_masked.fasta"
   """
 }
 
@@ -501,6 +502,7 @@ process genome_consensus {
  * STEP 4.1 MultiQC
  */
 process multiqc {
+	tag "$prefix"
     publishDir path: { "${params.outdir}/99-stats/MultiQC" }, mode: 'copy'
 
     input:
