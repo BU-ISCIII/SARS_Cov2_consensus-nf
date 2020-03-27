@@ -314,8 +314,8 @@ process mapping_virus {
   file index from viral_index_files.collect()
 
 	output:
-	file '*_sorted.bam' into mapping_virus_sorted_bam,mapping_virus_sorted_bam_variant_calling
-  file '*.bam.bai' into mapping_virus_bai,mapping_virus_bai_variant_calling
+	file '*_sorted.bam' into mapping_virus_sorted_bam,mapping_virus_sorted_bam_variant_calling,mapping_virus_sorted_bam_consensus
+  file '*.bam.bai' into mapping_virus_bai,mapping_virus_bai_variant_calling,mapping_virus_bai_consensus
 	file '*_flagstat.txt' into mapping_virus_flagstat
 	file '*.stats' into mapping_virus_picardstats
 
@@ -345,8 +345,8 @@ if (params.amplicons_file) {
     file index from viral_index_files_ivar.collect()
 
 	  output:
-	  file '*_primertrimmed_sorted.bam' into ivar_sorted_bam,sorted_bam_variant_calling,ivar_sorted_bam_consensus
-    file '*_primertrimmed_sorted.bam.bai' into ivar_bai,bam_bai_variant_calling,ivar_bai_consensus
+	  file '*_primertrimmed_sorted.bam' into ivar_sorted_bam,sorted_bam_variant_calling,sorted_bam_consensus
+    file '*_primertrimmed_sorted.bam.bai' into ivar_bai,bam_bai_variant_calling,bai_consensus
     file '*_flagstat.txt' into ivar_flagstat
   	file '*.stats' into ivar_picardstats
 
@@ -367,6 +367,10 @@ if (params.amplicons_file) {
       .set {sorted_bam_variant_calling}
     mapping_virus_bai_variant_calling
       .set {bam_bai_variant_calling}
+    mapping_virus_sorted_bam_consensus
+      .set {sorted_bam_consensus}
+    mapping_virus_bai_consensus
+      .set {bai_consensus}
 }
 
 
@@ -462,8 +466,8 @@ process genome_consensus {
   input:
   file variants from majority_allele_vcf_consensus
   file refvirus from viral_fasta_file
-  file ivar_bam from ivar_sorted_bam_consensus
-  file ivar_bai from ivar_bai_consensus
+  file sorted_bam from sorted_bam_consensus
+  file sorted_bai from bai_consensus
 
   output:
   file '*_consensus.fasta' into consensus_fasta
@@ -476,7 +480,7 @@ process genome_consensus {
   bgzip -c $variants > $prefix"_"$refname".vcf.gz"
   bcftools index $prefix"_"$refname".vcf.gz"
   cat $refvirus | bcftools consensus $prefix"_"$refname".vcf.gz" > $prefix"_"$refname"_consensus.fasta"
-  bedtools genomecov -bga -ibam $ivar_bam -g $refvirus | awk '\$4 < 20' | bedtools merge > $prefix"_"$refname"_bed4mask.bed"
+  bedtools genomecov -bga -ibam $sorted_bam -g $refvirus | awk '\$4 < 20' | bedtools merge > $prefix"_"$refname"_bed4mask.bed"
   bedtools maskfasta -fi $prefix"_"$refname"_consensus.fasta" -bed $prefix"_"$refname"_bed4mask.bed" -fo $prefix"_"$refname"_consensus_masked.fasta"
   sed -i 's/NC_045512.2/$prefix/g' $prefix"_"$refname"_consensus_masked.fasta"
   """
