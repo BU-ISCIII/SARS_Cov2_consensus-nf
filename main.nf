@@ -27,6 +27,7 @@ Pipeline overview:
   - 3.4 : Bcftools - Consensus genome
  - 4. : Stats
   - 4.1 : MultiQC - Final html report with stats
+ - 5. : Output Description HTML
  ----------------------------------------------------------------------------------------
 */
 
@@ -104,9 +105,13 @@ if( params.host_fasta ){
     if( !host_fasta_file.exists() ) exit 1, "Fasta file not found: ${params.host_fasta}."
 }
 
+// Stage config files
+params.multiqc_config = "${baseDir}/conf/multiqc_config.yaml"
 
-// Output md template location
-output_docs = file("$baseDir/docs/output.md")
+if (params.multiqc_config){
+    multiqc_config = file(params.multiqc_config)
+}
+ch_output_docs = Channel.fromPath("$baseDir/docs/output.md")
 
 // Trimming
 // Trimming default
@@ -336,10 +341,14 @@ if (params.amplicons_file) {
 	  input:
 	  file sorted_bam from mapping_virus_sorted_bam_variant_calling
     file amplicons_bed from amplicons_bed_file
+    file refvirus from viral_fasta_file
+    file index from viral_index_files.collect()
 
 	  output:
 	  file '*_primertrimmed_sorted.bam' into ivar_sorted_bam,sorted_bam_variant_calling,ivar_sorted_bam_consensus
     file '*_primertrimmed_sorted.bam.bai' into ivar_bai,bam_bai_variant_calling,ivar_bai_consensus
+    file '*_flagstat.txt' into ivar_flagstat
+  	file '*.stats' into ivar_picardstats
 
 	  script:
     prefix = sorted_bam.baseName - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_sorted)?(_paired)?(_00*)?(\.bam)?(\.fastq)?(\.gz)?$/
@@ -349,6 +358,8 @@ if (params.amplicons_file) {
     ivar trim -e -i $prefix"_onlymapped.bam" -b $amplicons_bed -p $prefix"_primertrimmed" -q 15 -m 50 -s 4
     samtools sort -o $prefix"_primertrimmed_sorted.bam" -O bam -T $prefix $prefix"_primertrimmed.bam"
     samtools index $prefix"_primertrimmed_sorted.bam"
+    samtools flagstat $prefix"_primertrimmed_sorted.bam" > $prefix"_primertrimmed_flagstat.txt"
+    picard CollectWgsMetrics COVERAGE_CAP=1000000 I=$prefix"_primertrimmed_sorted.bam" O=$prefix"_primertrimmed.stats" R=$refhost
 	  """
   }
 } else {
@@ -469,4 +480,64 @@ process genome_consensus {
   bedtools maskfasta -fi $prefix"_"$refname"_consensus.fasta" -bed $prefix"_"$refname"_bed4mask.bed" -fo $prefix"_"$refname"_consensus_masked.fasta"
   sed -i 's/NC_045512.2/$prefix/g' $prefix"_"$refname"_consensus_masked.fasta"
   """
+}
+
+/*
+ * STEP 4.1 MultiQC
+ */
+process multiqc {
+    publishDir path: { "${params.outdir}/99-stats/MultiQC" }, mode: 'copy'
+
+    input:
+    file multiqc_config from multiqc_config
+    file (fastqc:'fastqc/*') from fastqc_results.collect().ifEmpty([])
+    file ('trimommatic/*') from trimmomatic_results.collect()
+    file ('trimommatic/*') from trimmomatic_fastqc_reports.collect()
+    file ('mappinh_host/*') from mapping_host_flagstat.collect()
+    file ('mappinh_host/*') from mapping_host_picardstats.collect()
+    file ('mapping_virus/*') from mapping_virus_flagstat.collect()
+    file ('mapping_virus/*') from mapping_virus_picardstats.collect()
+    file ('ivar/*') from ivar_flagstat.collect()
+    file ('ivar/*') from ivar_picardstats.collect()
+    file ('snpeff/majority*') from majority_snpeff_summary.collect()
+    file ('snpeff/lowfreq*') from lowfreq_snpeff_summary.collect()
+
+    output:
+    file '*multiqc_report.html' into multiqc_report
+    file '*_data' into multiqc_data
+    val prefix into multiqc_prefix
+
+    script:
+    prefix = fastqc[0].toString() - '_fastqc.html' - 'fastqc/'
+
+    """
+    multiqc -d . --config $multiqc_config
+    """
+}
+
+/*
+ * STEP 5 - Output Description HTML
+ */
+process output_documentation {
+    publishDir "${params.outdir}/../DOC/", mode: 'copy'
+
+    input:
+    file output_docs from ch_output_docs
+
+    output:
+    file "results_description.html"
+    file "*.pdf"
+
+    script:
+    if (params.service_id) {
+      """
+      markdown_to_html.r $output_docs results_description.html
+      wkhtmltopdf --keep-relative-links results_description.html INFRES_${params.service_id}.pdf
+      """
+    } else{
+      """
+      markdown_to_html.r $output_docs results_description.html
+      wkhtmltopdf --keep-relative-links results_description.html INFRES.pdf
+      """
+    }
 }
