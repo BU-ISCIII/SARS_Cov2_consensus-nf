@@ -24,6 +24,8 @@ dependencies:
   - bedtools=2.26.0
   ## Other
   - wkhtmltopdf=0.12.4
+  - conda-forge::r-markdown=0.9
+
   - pip:
     - joblib==0.14.1
     - numpy==1.18.1
