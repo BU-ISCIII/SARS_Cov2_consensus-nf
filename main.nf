@@ -534,7 +534,6 @@ process multiqc {
 
 /*
  * STEP 5 - Output Description HTML
- */
 process output_documentation {
     publishDir "$doc_output", mode: 'copy'
 
@@ -558,3 +557,4 @@ process output_documentation {
       """
     }
 }
+ */
