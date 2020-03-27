@@ -1,18 +1,22 @@
-# Output description for viral genome pipeline
+# Output description for SARS-Cov2 consensus genome pipeline
+**SARS_Cov2_consensus-nf** is a bioinformatics best-practice analysis pipeline used for SARS-Cov2 consensus genome generation. The pipeline is focused in mapping and variants calling.
+
+**Note**:If you want this PDF file to work you can't move it from DOC folder and you can't either move the files inside ANALYSIS folder.
 
 ## Pipeline overview
+The pipeline is built using [Nextflow](https://www.nextflow.io/) and processes data using the following steps:
 
-* [FastQC](#fastqc) v0.11.8 - read quality control.
-* [Trimmomatic](#trimming) v.0.33 - adapter and low quality trimming.
-* [BWA](#bwa) v0.7.12 - mapping against reference genome.
-* [SAMtools](#samtools) v1.2 - Alignment result processing and unmapped reads selection.
-* [Picard](#picard) v1.140 - Enrichment and alignment metrics.
-* [Bcftools](#bcftools) v1.9 - Variant calling and consensus genome
-* [SPADES](#spades) v3.7.1 - Viral genome assembly.
-* [QUAST](#quast) v4.1 - Assembly quality assessment.
-* [Blast](#blast) v2.6.0+ - Blast alignment.
-* [PlasmidID](#plasmidid) v.1.4.1 - Visualization of the alignment.
-* [ABACAS](#abacas) v.1.3.1 - Contig ordering according to reference.
+* <a href="#fastqc">FastQC</a> v0.11.8 - read quality control
+* <a href="#trimming">Trimmomatic</a> v.0.38 - adapter and low quality trimming.
+* <a href="#bowtie">Bowtie</a> v2.3.5 - mapping against reference genomes.
+* <a href="#samtools">SAMtools</a> v1.2 - Mapping result processing and unmapped reads selection.
+* <a href="#picard">Picard</a> v1.140 - Enrichment and alignment metrics.
+* <a href="#ivar">iVar</a> v1.1 - Amplicons primers trimming by position.
+* <a href="#varscan">VarScan</a> v2.4.4-0 - Variant calling.
+* <a href="#snpeff">snpEff and SnpSift</a> 4.3.1t - Variant calling annotation.
+* <a href="#bcftools">Bcftools</a> v1.9 - Variant calling index and consensus genome generation.
+* <a href="#bedtools">Bedtools</a> v2.26.0 - Consensus genome masking.
+* <a href="#multiqc">MultiQC</a> v1.7 - aggregate report, describing results of the whole pipeline.
 
 **Reference genome:** NC_045512.2
 
@@ -20,21 +24,19 @@ Depending on the analysis, we will have some ANALYSIS_IDs. This ANALYSIS_IDs are
 
 ## Preprocessing
 ### FastQC
-[FastQC](http://www.bioinformatics.babraham.ac.uk/projects/fastqc/) gives general quality metrics about your reads. It provides information about the quality score distribution across your reads, the per base sequence content (%T/A/G/C). You get information about adapter contamination and other overrepresented sequences.
+[FastQC](http://www.bioinformatics.babraham.ac.uk/projects/fastqc/)<a name="fastqc"> </a><a href="#fastqc_reference">[1]</a> gives general quality metrics about your reads. It provides information about the quality score distribution across your reads, the per base sequence content (%T/A/G/C). You get information about adapter contamination and other overrepresented sequences.
 
 For further reading and documentation see the [FastQC help](http://www.bioinformatics.babraham.ac.uk/projects/fastqc/Help/).
 
-**Output directory: `01-fastqc`**
+**Output directory: `01-fastQC`**
 
-* `{sample_id}/{sample_id}_R[12]_fastqc.html`
+* `{sample_id}_R[12]_fastqc.html`
   * html report. This file can be opened in your favourite web browser (Firefox/chrome preferable) and it contains the different graphs that fastqc calculates for QC.
-* `{sample_id}/{sample_id}_R[12]_fastqc`
-  * older with fastqc output in plain text.
-* `{sample_id}/{sample_id}_R[12]_fastqc.zip`
+* `zips/{sample_id}_R[12]_fastqc.zip`
   * zip file containing the FastQC report, tab-delimited data file and plot images
 
 ### Trimming
-[Trimmomatic](http://www.usadellab.org/cms/?page=trimmomatic) is used for removal of adapter contamination and trimming of low quality regions.
+[Trimmomatic](http://www.usadellab.org/cms/?page=trimmomatic)<a name="trimming"> </a><a href="#trimming_reference">[2]</a> is used for removal of adapter contamination and trimming of low quality regions.
 Parameters included for trimming are:
 -  Nucleotides with phred quality < 10 in 3'end.
 -  Mean phred quality < 20 in a 4 nucleotide window.
@@ -42,119 +44,127 @@ Parameters included for trimming are:
 
 **Results directory: `02-preprocessing`**
 - Files:
-   - `{sample_id}/{sample_id}_R[12]_filtered.fastq.gz`: contains high quality reads with both forward and reverse tags surviving.
-   - `{sample_id}/{sample_id}_R[12]_unpaired.fastq.gz`: contains high quality reads with only forward or reverse tags surviving.
+   - `trimmed/{sample_id}_R[12]_filtered.fastq.gz`: contains high quality reads with both forward and reverse tags surviving.
+   - `trimmed/{sample_id}_R[12]_unpaired.fastq.gz`: contains high quality reads with only forward or reverse tags surviving.
+   - `logs/{sample_id}.log`: trimming log file.
 
  **Note**:To see how your reads look after trimming, look at the FastQC reports in the ANALYSIS/{ANALYSIS_ID}/03-preprocQC directory
 
  **Note**:From now on, all the steps will be host specific.
 
-## Mapping
-### BWA
-[BWA](http://bio-bwa.sourceforge.net/) or Burrows-Wheeler Aligner, is designed for mapping low-divergent sequence reads against reference genomes. The result alignment files are further processed with [SAMtools](http://samtools.sourceforge.net/), sam format is converted to bam, sorted and an index .bai is generated.
+## Mapping and Primer trimming
+### Bowtie and Samtools
+[Bowtie](http://bio-bwa.sourceforge.net/)<a name="bowtie"> </a><a href="#Bowtie_reference">[3]</a> is an ultrafast and memory-efficient tool for aligning sequencing reads to long reference sequences. It is particularly good at aligning reads of about 50 up to 100s of characters to relatively long genomes. Bowtie 2 indexes the genome with an FM Index (based on the Burrows-Wheeler Transform or BWT) to keep its memory footprint small. Bowtie 2 supports gapped, local, and paired-end alignment modes.
+
+The result mapping files are further processed with [SAMtools](http://samtools.sourceforge.net/)<a name="samtools"> </a><a href="#SAMtools_reference">[4]</a>, sam format is converted to bam, sorted and an index .bai is generated.
 
 We mapped the fastq file agains both reference host genome and reference viral genome.
 
-**Output directory: `0[4/6]-mapping_[host/virus]`**
+**Output directory: `0[4/5]-mapping_[host/virus]`**
 
-* `{sample_id}_sorted.bam`
+* `mapping/{sample_id}_sorted.bam`
   * Sorted aligned bam file.
-* `{sample_id}_sorted.bam.bai`
+* `mapping/{sample_id}_sorted.bam.bai`
   * Index file for soreted aligned bam.
-* `{sample_id}_flagstat.txt`
-  * Mapping stats summary.
+* `stats/{sample_id}_flagstat.txt`
+  * Samtools flagstats mapping stats summary.
 
 ### Picard
-[Picard](https://broadinstitute.github.io/picard/index.html) is a set of command line tools for manipulating high-throughput sequencing (HTS) data. In this case we used it to obtain mapping stats.
+[Picard](https://broadinstitute.github.io/picard/index.html)<a name="picard"> </a><a href="#Picard_reference">[5]</a> is a set of command line tools for manipulating high-throughput sequencing (HTS) data. In this case we used it to obtain mapping stats.
 
-**Output directory: `0[4/6]-mapping_[host/virus]`**
+**Output directory: `0[4/5]-mapping_[host/virus]`**
 
-* `{sample_id}.stats`
+* `stats/{sample_id}.stats`
   * Picard metrics summary file for evaluating coverage and performance.
 
 Picard documentation: [Picarddocs](https://broadinstitute.github.io/picard/command-line-overview.html)
 
-## Variant calling and consensus genome
-The first approach we used to generate the consensus viral genome was to call for variants between the mapped reads and the reference viral genome, and adding these variants to the reference viral genome.
-**NOTE:** This analysis couldn't be performed in with this data due to low % of reads mapping against the virus reference genome.
-## Bcftools
-[Bcftools](http://samtools.github.io/bcftools/bcftools.html) mpileup command is used for generate a pileup for one the BAM files. In the pileup format each line represents a genomic position, consisting of chromosome name, 1-based coordinate, reference base, the number of reads covering the site, read bases, base qualities and alignment mapping qualities. Information on match, mismatch, indel, strand, mapping quality and start and end of a read are all encoded at the read base column.
+### iVar
+[iVar](http://gensoft.pasteur.fr/docs/ivar/1.0/manualpage.html)<a name="ivar"> </a><a href="#iVar_reference">[6]</a> uses primer positions supplied in a BED file to soft clip primer sequences from an aligned, sorted and indexed BAM file. Following this, the reads are trimmed based on a quality threshold through a sliding window approach that slides from the 5' end to the 3' end and if at any point the average base quality in the window falls below the threshold, the remaining read is soft clipped. If after trimming, the length of the read is greater than the minimum length specified, the read is written to the new trimmed BAM file.
 
-The resulting variant calling vcf for haploid genomes is indexed and then the consensus genome is created adding the variants to the reference viral genome. This consensus genome was obtained using the predominant variants of the mapping file.
+**Output directory: `05-mapping_virus`**
 
-**Output directory: `06-mapping_consensus`**
-* `{sample_id}_{reference_virus_name}/{sample_id}_{reference_virus_name}.vcf.gz`
-  * Compressed format of the variants file.
-* `{sample_id}_{reference_virus_name}/{sample_id}_{reference_virus_name}.vcf.gz.csi`
-  * Compressed format of the indexed variants file.
-* `{sample_id}_{reference_virus_name}/{sample_id}_{reference_virus_name}_consensus.fasta`
+* `{sample_id}_primertrimmed_sorted.bam`
+  * Sorted aligned bam file after trimming.
+* `{sample_id}_primertrimmed_sorted.bam.bai`
+  * Index file for sorted aligned trimmed bam.
+* `{sample_id}_primertrimmed_flagstats.txt`
+  * Samtools flagstats summary file.
+* `{sample_id}_primertrimmed.stats`
+  * Picard metrics summary file for evaluating coverage and performance.
+
+## Variant calling
+In this pipeline to generate the consensus viral genome we use the approach of calling for variants between the mapped reads and the reference viral genome, and adding these variants to the reference viral genome.
+
+### Variant calling
+#### VarScan
+First of all SAMtools is used to generate the variant calling VCF file. Then [VarScan](http://varscan.sourceforge.net/)<a name="varscan"> </a><a href="#VarScan_reference">[7]</a> is used to call for major and low frequency variants. VarScan is a platform-independent software tool developed at the Genome Institute at Washington University to detect variants in NGS data.
+
+**Output directory: `06-variant_calling`**
+
+* `pileup/{sample_id}.pileup`
+  * Variant calling pileup file. The pileup file summarises all data from the reads at each genomic region that is covered by at least one read. Each row of the pileup file gives similar information to a single vertical column of reads in the IGV view.
+* `lowfreq_vars/{sample_id}_lowfreq.vcf`
+  * Low frequency variants VCF.
+* `majority_allele/{sample_id}_majority.vcf`
+  * Majority variants VCF file.
+
+### Annotation
+#### SnpEff and SnpSift
+[SnpEff](http://snpeff.sourceforge.net/SnpEff.html)<a name="snpeff"> </a><a href="#SnpEff_reference">[8]</a> is a genetic variant annotation and functional effect prediction toolbox. It annotates and predicts the effects of genetic variants on genes and proteins (such as amino acid changes). [SnpSift](http://snpeff.sourceforge.net/SnpSift.html) annotates genomic variants using databases, filters, and manipulates genomic annotated variants. Once you annotated your files using SnpEff, you can use SnpSift to help you filter large genomic datasets in order to find the most significant variants for your experiment.
+
+**Output directory: `07-annotation`**
+
+* `lowfreq/{sample_id}_lowfreq.ann.table.txt`
+  * Low frequency variants SnpSift summary table.
+* `lowfreq/{sample_id}_lowfreq.ann.vcf`
+  * Low frequency variants annotated VCF table.
+* `lowfreq/{sample_id}_lowfreq_snpEff_genes.txt`
+  * Low frequency variants genes table.
+* `lowfreq/{sample_id}_lowfreq_snpEff_summary.html`
+  * Low frequency variants summary html file.
+* `majority/{sample_id}_majority.ann.table.txt`
+  * Majority variants SnpSift summary table.
+* `majority/{sample_id}_majority.ann.vcf`
+  * Majority variants annotated VCF table.
+* `majority/{sample_id}_majority_snpEff_genes.txt`
+  * Majority variants genes table.
+* `majority/{sample_id}_majority_snpEff_summary.html`
+  * Majority variants summary html file.
+
+## Consensus genome
+### BCFtools
+[Bcftools](http://samtools.github.io/bcftools/bcftools.html)<a name="bcftools"> </a><a href="#BCFtools_reference">[9]</a> is a set of utilities that manipulate variant calls in the Variant Call Format (VCF) and its binary counterpart BCF. The resulting variant calling vcf for haploid genomes is indexed and then the consensus genome is created adding the variants to the reference viral genome. This consensus genome was obtained using the predominant variants (majority) of the mapping file.
+
+**Output directory: `08-mapping_consensus`**
+
+* `consensus/{sample_id}_{reference_virus_name}_consensus.fasta`
   * Consensus viral genome file generated from adding the variants called before to the viral reference genome. These variants are only the majoritarian variants, inlcuding only SNPs and small indels. This file is also contained in the 10-final_results folder as {sample_id}_{reference_virus_name}_consensus.fasta.
 
-## Viral genome assembly
-Other approach we used to generate the consensus viral genome was assembling the reads that didn't mapped to the host genome.
-### SAMtools
-In this section SAMtools was used to obtain the reads that didn't mapped with the host genome. This reads where sorted and converted to fastq files.
+### Bedtools
+[Bedtools](https://bedtools.readthedocs.io/en/latest/)<a name="bedtools"> </a><a href="#Bedtools_reference">[10]</a> are a swiss-army knife of tools for a wide-range of genomics analysis tasks. In this case we use:
+  * bedtools genomecov computes histograms (default), per-base reports (-d) and BEDGRAPH (-bg) summaries of feature coverage (e.g., aligned sequences) for a given genome.
+  * bedtools maskfasta masks sequences in a FASTA file based on intervals defined in a feature file. This may be useful fro creating your own masked genome file based on custom annotations or for masking all but your target regions when aligning sequence data from a targeted capture experiment.
 
-**Output directory: `07-assembly`**
-* `{sample_id}_R[1,2]_unmapped.fastq`
-  * fastq file with the reads that didn't mapped with the host genome.
+**Output directory: `08-mapping_consensus`**
 
+* `masked/{sample_id}_{reference_virus_name}_consensus_masked.fasta`
+  * Masked consensus fasta file.
 
-### SPAdes
-[SPAdes](https://kbase.us/applist/apps/kb_SPAdes/run_SPAdes/release?gclid=Cj0KCQiAt_PuBRDcARIsAMNlBdroQS7y2hPFuhagq1QPvQ39FcvGxbhtZwhn8YbxIB4LrGIHKjJ-iPwaAn_lEALw_wcB) is a de Bruijn graph-based assembler. We selected the reads that didn't mapped with the host genome and assembled them using SPAdes to create a viral genome assembly.
+## Stats
+### MultiQC
+[MultiQC](http://multiqc.info)<a name="multiqc"> </a><a href="#MultiQC_reference">[11]</a> is a visualization tool that generates a single HTML report summarizing all samples in your project. Most of the pipeline QC results are visualized in the report and further statistics are available in within the report data directory.
 
-**Output directory: `07-assembly`**
-* `{sample_id}/contigs.fasta`
-  * Assembled contigs. This file is also contained in the 10-final_results folder as {sample_id}_consensus.fasta.
-* `{sample_id}/scaffolds.fasta`
-  * Assembled scaffolds.
+The pipeline has special steps which allow the software versions used to be reported in the MultiQC output for future traceability.
 
-### QUAST
-[QUAST](http://bioinf.spbau.ru/quast) evaluates genome assemblies. We compared the reference genome with the contigs and scaffold assemblies. The html results can be opened with any browser (we recommend using Google Chrome).
+**Output directory: `99-stats/MultiQC/`**
 
-**Output directory: `07-assembly/quast_results`**
-* `quast_results/date/report.html`
-  * Compressed format of the indexed variants file.
-  * The meaning of the different metrics:
-    * Contigs (≥ x bp): is total number of contigs of length ≥ x bp.
-    * Total length (≥ x bp): is the total number of bases in contigs of length ≥ x bp.
-    * Contigs: is the total number of contigs in the assembly.
-    * Largest contig: is the length of the longest contig in the assembly.
-    * Total length: is the total number of bases in the assembly.
-    * Reference length: is the total number of bases in the reference genome.
-    * GC (%): is the total number of G and C nucleotides in the assembly, divided by the total length of the assembly.
-    * Reference GC (%): is the percentage of G and C nucleotides in the reference genome.
-    * N50: is the length for which the collection of all contigs of that length or longer covers at least half an assembly.
-    * NG50: is the length for which the collection of all contigs of that length or longer covers at least half the reference genome. This metric is computed only if the reference genome is provided.
-    * N75 and NG75: are defined similarly to N50 but with 75 % instead of 50 %.
-    * L50 (L75, LG50, LG75) is the number of contigs equal to or longer than N50 (N75, NG50, NG75). In other words, L50, for example, is the minimal number of contigs that cover half the assembly.
+* `multiqc_report.html`
+  * MultiQC report: standalone HTML file that can be viewed in your web browser
+* `multiqc_data/`
+  * Directory containing parsed statistics from the different tools used in the pipeline
 
-### Blast alignments
-[NCBI Blast](https://blast.ncbi.nlm.nih.gov/Blast.cgi) is used for aligning the contigs against the reference virus genome and the refseq bacterial genomes from NCBI database (Updated 2017).
-
-**Output directory:** `07-blast`
-* {sample_id}_blast_filt_header.txt: blast results against the target virus.
-* {sample_id}_blast_bacteria_filt.txt: blast results for bacteria database.
-
-### PlasmidID
-[PlasmidID](https://github.com/BU-ISCIII/plasmidID) was used to graphically represent the alignment of the reference genome with the assembly obtained with SPAdes. This helps to visualize the coverage of the reference genome in the assembly. To find more information about the output files go to: https://github.com/BU-ISCIII/plasmidID/wiki/Understanding-the-image:-track-by-track
-
-**Output directory: `10-final_results`**
-* `{sample_id}_{reference_viral_genome}.png`
-  * PNG file with the visualization of the alignment between the assembled viral genome and the reference viral genome.
-
-### ABACAS
-[Abacas](abacas.sourceforge.ne) intended to rapidly contiguate (align, order, orientate), visualize and design primers to close gaps on shotgun assembled contigs based on a reference sequence.
-
-**Output directory:** `13-abacas`
-* `{sample_id}`
-  * {samples_id}_abacas.fasta: Ordered and orientated sequence file.
-  * {sample_id}_abacas.tab: Feature file.
-  * {sample_id}_abacas.bin: Bin file that contains contigs that are not used in ordering.
-  * {sample_id}_abacas.crunch: Comparison file.
-  * {sample_id}_abacas.gaps: Gap information.
-  * unused_contigs.out: Information on contigs that have a mapping information but could not be used in the ordering.
-  * {samples_id}_abacas.MULTIFASTA.fa: A list of ordered and orientated contigs in a multi-fasta format.
+For more information about how to use MultiQC reports, see [http://multiqc.info](http://multiqc.info)
 
 ## Final Results
 We hace collected the most significant files for you.
