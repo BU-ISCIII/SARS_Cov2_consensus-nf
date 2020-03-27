@@ -22,6 +22,8 @@ dependencies:
   - snpeff
   - snpsift=4.3.1t
   - bedtools=2.26.0
+  ## Other
+  - wkhtmltopdf=0.12.4
   - pip:
     - joblib==0.14.1
     - numpy==1.18.1
