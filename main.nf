@@ -154,7 +154,7 @@ if( params.viral_index ){
     Channel
         .fromPath(params.viral_index)
         .ifEmpty { exit 1, "Viral fasta index not found: ${params.viral_index}" }
-        .into { viral_index_files; viral_index_files_ivar viral_index_files_variant_calling }
+        .into { viral_index_files; viral_index_files_ivar; viral_index_files_variant_calling }
 }
 
 
