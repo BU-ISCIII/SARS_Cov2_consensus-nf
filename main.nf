@@ -402,9 +402,11 @@ process variant_calling_annotation {
 			if (filename.indexOf("majority.ann.vcf") > 0) "majority/$filename"
 			else if (filename.indexOf("majority_snpEff_genes.txt") > 0) "majority/$filename"
       else if (filename.indexOf("majority_snpEff_summary.html") > 0) "majority/$filename"
+      else if (filename.indexOf("majority.ann.table.txt") > 0) "majority/$filename"
       else if (filename.indexOf("lowfreq.ann.vcf") > 0) "lowfreq/$filename"
       else if (filename.indexOf("lowfreq_snpEff_genes.txt") > 0) "lowfreq/$filename"
       else if (filename.indexOf("lowfreq_snpEff_summary.html") > 0) "lowfreq/$filename"
+      else if (filename.indexOf("lowfreq.ann.table.txt") > 0) "lowfreq/$filename"
 	}
 
  	input:
@@ -418,6 +420,8 @@ process variant_calling_annotation {
   file '*_lowfreq.ann.vcf' into lowfreq_annotated_variants
   file '*_lowfreq_snpEff_genes.txt' into lowfreq_snpeff_genes
  	file '*_lowfreq_snpEff_summary.html' into lowfreq_snpeff_summary
+  file '*_majority.ann.table.txt' into snpsift_majority_table
+  file '*_lowfreq.ann.table.txt' into snpsift_lowfreq_table
 
  	script:
  	prefix = majority_variants.baseName - ~/(_S[0-9]{2})?(_majority)?(.R1)?(_1)?(_R1)?(_sorted)?(_paired)?(_00*)?(\.bam)?(\.vcf)?(\.gz)?$/
@@ -428,6 +432,8 @@ process variant_calling_annotation {
   snpEff sars-cov-2 $low_variants > $prefix"_lowfreq.ann.vcf"
   mv snpEff_genes.txt $prefix"_lowfreq_snpEff_genes.txt"
   mv snpEff_summary.html $prefix"_lowfreq_snpEff_summary.html"
+  SnpSift extractFields -s "," -e "." $prefix"_majority.ann.vcf" CHROM POS REF ALT "ANN[*].GENE" "ANN[*].GENEID" "ANN[*].IMPACT" "ANN[*].EFFECT" "ANN[*].FEATURE" "ANN[*].FEATUREID" "ANN[*].BIOTYPE" "ANN[*].RANK" "ANN[*].HGVS_C" "ANN[*].HGVS_P" "ANN[*].CDNA_POS" "ANN[*].CDNA_LEN" "ANN[*].CDS_POS" "ANN[*].CDS_LEN" "ANN[*].AA_POS" "ANN[*].AA_LEN" "ANN[*].DISTANCE" "EFF[*].EFFECT" "EFF[*].FUNCLASS" "EFF[*].CODON" "EFF[*].AA" "EFF[*].AA_LEN" > $prefix"_majority.ann.table.txt"
+  SnpSift extractFields -s "," -e "." $prefix"_lowfreq.ann.vcf" CHROM POS REF ALT "ANN[*].GENE" "ANN[*].GENEID" "ANN[*].IMPACT" "ANN[*].EFFECT" "ANN[*].FEATURE" "ANN[*].FEATUREID" "ANN[*].BIOTYPE" "ANN[*].RANK" "ANN[*].HGVS_C" "ANN[*].HGVS_P" "ANN[*].CDNA_POS" "ANN[*].CDNA_LEN" "ANN[*].CDS_POS" "ANN[*].CDS_LEN" "ANN[*].AA_POS" "ANN[*].AA_LEN" "ANN[*].DISTANCE" "EFF[*].EFFECT" "EFF[*].FUNCLASS" "EFF[*].CODON" "EFF[*].AA" "EFF[*].AA_LEN" > $prefix"_lowfreq.ann.table.txt"
  	"""
 }
 
