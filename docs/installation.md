@@ -48,8 +48,6 @@ Be warned of two important points about this default configuration:
     * See the [nextflow docs](https://www.nextflow.io/docs/latest/executor.html) for information about running with other hardware backends. Most job scheduler systems are natively supported.
 2. Nextflow will expect all software to be installed and available on the `PATH`
     * You can create a conda environment with all the programs needed for this pipeline with our [environment.yml file](../environment.yml). See below.
-3. For [plasmidID](https://github.com/BU-ISCIII/plasmidID) you will have to download it from its main page and change in the [base config file](../conf/base.config) the variable that exports the path to plasmidID and plasmidID/bin folders:
-    * PATH="$PATH:/path/to/your/plasmidID/:/path/to/your/plasmidID/bin/"
 
 ### Conda
 You can use conda to manage the software requirements.
