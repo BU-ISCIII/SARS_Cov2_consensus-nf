@@ -20,6 +20,7 @@ dependencies:
   - bowtie2=2.3.5
   - varscan=2.4.4-0
   - snpeff
+  - snpsift=4.3.1t
   - bedtools=2.26.0
   - pip:
     - joblib==0.14.1
