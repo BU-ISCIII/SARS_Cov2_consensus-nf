@@ -154,7 +154,7 @@ if( params.viral_index ){
     Channel
         .fromPath(params.viral_index)
         .ifEmpty { exit 1, "Viral fasta index not found: ${params.viral_index}" }
-        .into { viral_index_files; viral_index_files_variant_calling }
+        .into { viral_index_files; viral_index_files_ivar viral_index_files_variant_calling }
 }
 
 
@@ -342,7 +342,7 @@ if (params.amplicons_file) {
 	  file sorted_bam from mapping_virus_sorted_bam_variant_calling
     file amplicons_bed from amplicons_bed_file
     file refvirus from viral_fasta_file
-    file index from viral_index_files.collect()
+    file index from viral_index_files_ivar.collect()
 
 	  output:
 	  file '*_primertrimmed_sorted.bam' into ivar_sorted_bam,sorted_bam_variant_calling,ivar_sorted_bam_consensus
