@@ -64,6 +64,6 @@ vim SnpEff.config ## Add new genome entry.
 mkdir -p data/genomes
 mkdir -p data/sars-cov-2
 cp /path/to/reference/fasta/GCF_009858895.2_ASM985889v3_genomic.fna data/genomes/sars-cov-2.fa
-cp /path/to/reference/fasta/GCF_009858895.2_ASM985889v3_genomic.gff data/data/sars-cov-2/genes.gff
+cp /path/to/reference/fasta/GCF_009858895.2_ASM985889v3_genomic.gff data/sars-cov-2/genes.gff
 java -jar snpEff.jar build -gff3 -v sars-cov-2
 ```
