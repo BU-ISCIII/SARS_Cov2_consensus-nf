@@ -111,6 +111,13 @@ params.multiqc_config = "${baseDir}/conf/multiqc_config.yaml"
 if (params.multiqc_config){
     multiqc_config = file(params.multiqc_config)
 }
+
+params.doc_output = "${params.outdir}/../DOC/"
+
+if (params.doc_output){
+    doc_output = params.doc_output
+}
+
 ch_output_docs = Channel.fromPath("$baseDir/docs/output.md")
 
 // Trimming
@@ -527,7 +534,7 @@ process multiqc {
  * STEP 5 - Output Description HTML
  */
 process output_documentation {
-    publishDir "${params.outdir}/../DOC/", mode: 'copy'
+    publishDir "$doc_output", mode: 'copy'
 
     input:
     file output_docs from ch_output_docs
