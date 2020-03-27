@@ -484,7 +484,7 @@ process genome_consensus {
 
 /*
  * STEP 4.1 MultiQC
-
+ */
 process multiqc {
     publishDir path: { "${params.outdir}/99-stats/MultiQC" }, mode: 'copy'
 
@@ -514,7 +514,7 @@ process multiqc {
     multiqc -d . --config $multiqc_config
     """
 }
- */
+
 /*
  * STEP 5 - Output Description HTML
 
