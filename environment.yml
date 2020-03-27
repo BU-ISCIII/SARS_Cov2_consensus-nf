@@ -8,30 +8,30 @@ channels:
   - hcc
 dependencies:
   ## Common
-  - fastqc=0.11.8
-  - trimmomatic=0.38
-  - samtools=1.9
-  - multiqc=1.5
-  - pip=19.3.1
+  - fastqc
+  - trimmomatic
+  - samtools
+  - multiqc
+  - pip
   ## mapping
-  - ivar=1.1
-  - picard=2.18.27
-  - bcftools=1.9
-  - bowtie2=2.3.5
-  - varscan=2.4.4-0
+  - ivar
+  - picard
+  - bcftools
+  - bowtie2
+  - varscan
   - snpeff
-  - snpsift=4.3.1t
-  - bedtools=2.26.0
+  - snpsift
+  - bedtools
   ## Other
-  - wkhtmltopdf=0.12.4
-  - conda-forge::r-markdown=0.9
+  - wkhtmltopdf
+  - conda-forge::r-markdown
 
   - pip:
-    - joblib==0.14.1
-    - numpy==1.18.1
-    - pandas==1.0.1
-    - python-dateutil==2.8.1
-    - pytz==2019.3
-    - scikit-learn==0.22.2.post1
-    - scipy==1.4.1
-    - six==1.14.0
+    - joblib
+    - numpy
+    - pandas
+    - python-dateutil
+    - pytz
+    - scikit-learn
+    - scipy
+    - six

@@ -208,6 +208,7 @@ try {
  * STEP 1.1 - FastQC
  */
 process fastqc {
+	label "small"
 	tag "$prefix"
 	publishDir "${params.outdir}/01-fastQC", mode: 'copy',
 		saveAs: {filename -> filename.indexOf(".zip") > 0 ? "zips/$filename" : "$filename"}
@@ -223,7 +224,9 @@ process fastqc {
 
 	prefix = name - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_trimmed)?(_val_1)?(_00*)?(\.fq)?(\.fastq)?(\.gz)?$/
 	"""
-	fastqc -t 1 $reads
+	mkdir tmp
+	fastqc -t ${task.cpus} -dir tmp $reads
+	rm -rf tmp
 	"""
 }
 
@@ -231,6 +234,7 @@ process fastqc {
  * STEPS 1.2 Trimming
  */
 process trimming {
+	label "small"
 	tag "$prefix"
 	publishDir "${params.outdir}/02-preprocessing", mode: 'copy',
 		saveAs: {filename ->
@@ -252,7 +256,7 @@ process trimming {
 	script:
 	prefix = name - ~/(_S[0-9]{2})?(_L00[1-9])?(.R1)?(_1)?(_R1)?(_trimmed)?(_val_1)?(_00*)?(\.fq)?(\.fastq)?(\.gz)?$/
 	"""
-	java -jar $TRIMMOMATIC_PATH/trimmomatic-0.33.jar PE -threads 1 -phred33 $reads $prefix"_paired_R1.fastq" $prefix"_unpaired_R1.fastq" $prefix"_paired_R2.fastq" $prefix"_unpaired_R2.fastq" ILLUMINACLIP:${params.trimmomatic_adapters_file}:${params.trimmomatic_adapters_parameters} SLIDINGWINDOW:${params.trimmomatic_window_length}:${params.trimmomatic_window_value} MINLEN:${params.trimmomatic_mininum_length} 2> ${name}.log
+	trimmomatic PE -threads ${task.cpus} -phred33 $reads $prefix"_paired_R1.fastq" $prefix"_unpaired_R1.fastq" $prefix"_paired_R2.fastq" $prefix"_unpaired_R2.fastq" ILLUMINACLIP:${params.trimmomatic_adapters_file}:${params.trimmomatic_adapters_parameters} SLIDINGWINDOW:${params.trimmomatic_window_length}:${params.trimmomatic_window_value} MINLEN:${params.trimmomatic_mininum_length} 2> ${name}.log
 
 	gzip *.fastq
 
