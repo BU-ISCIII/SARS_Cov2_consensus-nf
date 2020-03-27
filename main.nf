@@ -359,7 +359,7 @@ if (params.amplicons_file) {
     samtools sort -o $prefix"_primertrimmed_sorted.bam" -O bam -T $prefix $prefix"_primertrimmed.bam"
     samtools index $prefix"_primertrimmed_sorted.bam"
     samtools flagstat $prefix"_primertrimmed_sorted.bam" > $prefix"_primertrimmed_flagstat.txt"
-    picard CollectWgsMetrics COVERAGE_CAP=1000000 I=$prefix"_primertrimmed_sorted.bam" O=$prefix"_primertrimmed.stats" R=$refhost
+    picard CollectWgsMetrics COVERAGE_CAP=1000000 I=$prefix"_primertrimmed_sorted.bam" O=$prefix"_primertrimmed.stats" R=$refvirus
 	  """
   }
 } else {
