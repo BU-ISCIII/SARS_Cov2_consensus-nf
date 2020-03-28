@@ -22,4 +22,4 @@ The BU-ISCIII/SARS_Cov2 pipeline comes with documentation about the pipeline, fo
 2. [Running the pipeline](docs/usage.md)
 3. [Output and how to interpret the results](docs/output.md)
 
-***CREDIT: We inspired in [nf-core](https://nf-co.re/) templates ***
+*** CREDIT: We inspired in [nf-core](https://nf-co.re/) templates ***
