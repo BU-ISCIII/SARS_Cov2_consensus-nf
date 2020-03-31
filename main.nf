@@ -383,6 +383,8 @@ if (params.amplicons_file) {
       .set {sorted_bam_consensus}
     mapping_virus_bai_consensus
       .set {bai_consensus}
+    ivar_flagstat = Channel.empty()
+    ivar_picardstats = Channel.empty()
 }
 
 
